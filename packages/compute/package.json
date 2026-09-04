@@ -1,5 +1,5 @@
 {
-  "name": "@vaultbench/shared",
+  "name": "@vaultbench/compute",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,23 +7,24 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./decimal": {
-      "types": "./src/decimal.ts",
-      "default": "./src/decimal.ts"
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests",
+    "recompute": "tsx src/run.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.864.0",
+    "@vaultbench/core": "workspace:*",
+    "@vaultbench/db": "workspace:*",
+    "@vaultbench/shared": "workspace:*",
     "decimal.js": "^10.6.0",
-    "zod": "^4.5.4"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
     "@types/node": "^22.20.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^5.0.0"
   }

@@ -8,3 +8,4 @@ export * from './http.js';
 export * from './gzip.js';
 export * from './cli.js';
 export * from './env.js';
+export * from './guards.js';

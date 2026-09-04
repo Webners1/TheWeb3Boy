@@ -58,7 +58,40 @@ const SECRET_PATTERNS = [
 // Rule 3 — Database writes are strictly scoped.
 // ---------------------------------------------------------------------------
 const DB_MODULES = ['@vaultbench/db', 'drizzle-orm', 'drizzle-kit', 'postgres', 'pg'];
-const DB_ALLOWED_PACKAGES = new Set(['db', 'ingest']);
+// `ingest` owns the raw tables; `compute` owns the derived ones and is held to
+// that by the derived-writes-only rule below.
+const DB_ALLOWED_PACKAGES = new Set(['db', 'ingest', 'compute']);
+
+// ---------------------------------------------------------------------------
+// Rule 4 — packages/core performs zero I/O.
+//
+// Load-bearing, not stylistic: the maths has to be shared unchanged by the
+// recompute job, the API and the MCP server, and has to be testable against
+// fixtures. One fetch or one database handle in here and all three lose that.
+// ---------------------------------------------------------------------------
+const CORE_ALLOWED_IMPORTS = new Set(['decimal.js', '@vaultbench/shared/decimal', 'vitest']);
+const IO_GLOBALS = [
+  [/\bfetch\s*\(/, 'fetch() is I/O; core takes data as arguments'],
+  [/\bprocess\.env\b/, 'reading the environment is I/O; pass configuration in'],
+  [/\bnew Date\s*\(\s*\)/, 'reading the clock makes the maths untestable; pass the date in'],
+  [/\bDate\.now\s*\(/, 'reading the clock makes the maths untestable; pass the date in'],
+];
+
+// ---------------------------------------------------------------------------
+// Rule 5 — Derived writes only.
+//
+// AGENTS.md grants `compute` write authority over derived tables alone. The
+// raw archive is append-only and belongs to `ingest`; a recompute that could
+// rewrite a snapshot would destroy the one asset that cannot be rebuilt.
+// ---------------------------------------------------------------------------
+const RAW_TABLES = [
+  'entities',
+  'entitySnapshots',
+  'depositors',
+  'benchmarkPrices',
+  'entityMetadataHistory',
+];
+const MUTATIONS = ['insert', 'update', 'delete'];
 
 const importSpecifiers = (code) => {
   const found = [];
@@ -115,10 +148,39 @@ for (const file of [...new Set(scanTargets)]) {
       }
     }
   }
+
+  if (!isGuard && owningPackage === 'core') {
+    for (const specifier of importSpecifiers(code)) {
+      if (specifier.startsWith('./') || specifier.startsWith('../')) continue;
+      if (CORE_ALLOWED_IMPORTS.has(specifier)) continue;
+      fail('core-zero-io', file, `core may not import ${specifier}`);
+    }
+    if (!isTest) {
+      for (const [pattern, detail] of IO_GLOBALS) {
+        if (pattern.test(code)) fail('core-zero-io', file, detail);
+      }
+    }
+  }
+
+  if (!isGuard && !isTest && owningPackage === 'compute') {
+    for (const table of RAW_TABLES) {
+      for (const mutation of MUTATIONS) {
+        // e.g. `.insert(entitySnapshots)` — a write against a raw table.
+        const pattern = new RegExp(`\\.${mutation}\\s*\\(\\s*${table}\\b`);
+        if (pattern.test(code)) {
+          fail(
+            'derived-writes-only',
+            file,
+            `compute may not ${mutation} ${table}; raw tables belong to ingest`,
+          );
+        }
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Rule 4 — The harness documents itself.
+// Rule 6 — The harness documents itself.
 // ---------------------------------------------------------------------------
 for (const required of ['AGENTS.md', 'docs/traps.md']) {
   const full = path.join(repoRoot, required);
@@ -130,6 +192,8 @@ const RULE_ORDER = [
   'no-floating-point',
   'no-hardcoded-secrets',
   'scoped-db-writes',
+  'core-zero-io',
+  'derived-writes-only',
   'harness-present',
 ];
 

@@ -19,7 +19,12 @@ const REQUIRED_TABLES = [
   'entity_metadata_history',
   'ingest_runs',
   'metric_definitions',
+  'entity_nav',
+  'entity_metrics',
 ] as const;
+
+/** Derived tables: safe to TRUNCATE and rebuild from the raw tables. */
+const DERIVED_TABLES = ['entity_flows', 'entity_nav', 'entity_metrics'] as const;
 
 /** Postgres column types that cannot represent money exactly. */
 const FLOAT_COLUMN_TYPES = ['PgReal', 'PgDoublePrecision'];
@@ -31,6 +36,20 @@ const MONEY_COLUMNS: Record<string, string[]> = {
   depositors: ['equity', 'pnl', 'all_time_pnl'],
   benchmark_prices: ['close_usd'],
   entity_metadata_history: ['fee_profit_share', 'fee_management', 'leader_commission'],
+  entity_nav: ['value_per_unit'],
+  entity_metrics: [
+    'twr',
+    'bench_twr_btc',
+    'bench_twr_eth',
+    'bench_twr_sol',
+    'alpha_btc',
+    'alpha_eth',
+    'alpha_sol',
+    'max_drawdown',
+    'volatility',
+    'follower_median_return',
+    'follower_gap',
+  ],
 };
 
 const tables = (Object.values(schema) as unknown[])
@@ -45,8 +64,33 @@ describe('schema shape', () => {
     expect(byName.has(name)).toBe(true);
   });
 
-  it('defines exactly the eight required tables', () => {
+  it('defines exactly the required tables and nothing else', () => {
     expect([...byName.keys()].sort()).toEqual([...REQUIRED_TABLES].sort());
+  });
+});
+
+describe('derived tables are rebuildable', () => {
+  it.each(DERIVED_TABLES)('keys %s so a recompute can upsert in place', (name) => {
+    const table = byName.get(name);
+    const primaryKey = table?.primaryKeys[0];
+    expect(primaryKey?.columns[0]?.name).toBe('entity_id');
+    expect(primaryKey?.columns.map((column) => column.name)).toContain('as_of');
+  });
+
+  it.each(DERIVED_TABLES)('stamps %s rows with the time they were computed', (name) => {
+    const table = byName.get(name);
+    const computedAt = table?.columns.find((column) => column.name === 'computed_at');
+    expect(computedAt?.notNull).toBe(true);
+  });
+
+  it('makes every entity_metrics figure defensible', () => {
+    // AGENTS.md § Design principles: never publish a number you cannot
+    // defend. Coverage travels with the figures, so it cannot be null.
+    const table = byName.get('entity_metrics');
+    for (const name of ['days_covered', 'is_full_window', 'sampling', 'headline_eligible']) {
+      const column = table?.columns.find((candidate) => candidate.name === name);
+      expect(column?.notNull, `entity_metrics.${name} must be NOT NULL`).toBe(true);
+    }
   });
 });
 

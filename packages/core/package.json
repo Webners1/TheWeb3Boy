@@ -1,5 +1,5 @@
 {
-  "name": "@vaultbench/shared",
+  "name": "@vaultbench/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,10 +7,6 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./decimal": {
-      "types": "./src/decimal.ts",
-      "default": "./src/decimal.ts"
     }
   },
   "scripts": {
@@ -18,9 +14,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.864.0",
-    "decimal.js": "^10.6.0",
-    "zod": "^4.5.4"
+    "@vaultbench/shared": "workspace:*",
+    "decimal.js": "^10.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

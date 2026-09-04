@@ -1,9 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Decimal } from '@vaultbench/shared';
 import {
@@ -13,20 +10,15 @@ import {
   entitySnapshots,
   ingestRuns,
 } from '@vaultbench/db';
+import { applyMigrations } from '@vaultbench/db/testing';
 
 import { IngestAbortError } from './guards.js';
 import { writeBackfillBatch, writeSourceBatch } from './writer.js';
 import type { SourceBatch } from './writer.js';
 
-const migrationPath = fileURLToPath(
-  new URL('../../db/migrations/0000_neat_magik.sql', import.meta.url),
-);
-
 async function createTestDb() {
   const client = new PGlite();
-  let sql = readFileSync(migrationPath, 'utf8').replaceAll('--> statement-breakpoint', '');
-  sql = sql.replace('USING brin', 'USING btree');
-  await client.exec(sql);
+  await applyMigrations(client);
   return drizzle(client);
 }
 

@@ -15,6 +15,7 @@
     "test": "turbo run test",
     "ingest": "pnpm --filter @vaultbench/ingest start --",
     "backfill": "pnpm --filter @vaultbench/backfill start --",
+    "recompute": "pnpm --filter @vaultbench/compute run recompute --",
     "db:generate": "pnpm --filter @vaultbench/db run generate"
   },
   "devDependencies": {

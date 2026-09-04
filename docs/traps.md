@@ -35,8 +35,11 @@ difference it.
 
 - A $10M deposit moves `accountValueHistory` by $10M with zero trading PnL.
   It is not a return series.
-- `value_per_unit` is reserved for a true per-unit NAV, reported or derived
-  from flows. Deriving it is a later task's job.
+- `value_per_unit` on a snapshot is reserved for venues that genuinely publish
+  a per-unit NAV. For Hyperliquid and OKX it stays null.
+- The derived per-unit series lives in `entity_nav`, written by
+  `packages/compute`, never back into the raw snapshot row. See the authority
+  note in `AGENTS.md`.
 - Never treat `account_value` deltas as performance.
 
 ## 4. Silent Failures
@@ -66,4 +69,48 @@ as 0x hex.
 
 Open subpositions return `closeTime: ""`. Treat empty string as null, not as
 epoch 0.
+
+## 8. A deposit is not a return, and neither is a withdrawal
+
+`netFlow[t] = (accountValue[t] - accountValue[t-1]) - (cumPnl[t] - cumPnl[t-1])`.
+Everything downstream depends on this one line being right.
+
+- Chain-link sub-period returns: `r[t] = ΔPnL[t] / (accountValue[t-1] + 0.5 × netFlow[t])`.
+- The 0.5 weight is Modified Dietz. A daily snapshot does not reveal when
+  inside the day a deposit landed, so mid-period is the honest assumption.
+  `entity_nav.method` records `simple` when there was no flow and the return
+  is exact, `dietz` when it was estimated.
+- If the denominator is zero or negative the period is not computable. The
+  chain truncates rather than bridging — bridging invents a return nobody
+  earned.
+
+## 9. A total wipeout is a real -100%, but it cannot compound
+
+A vault that reaches zero equity gets a final `entity_nav` point at 0. The
+chain then ends. A later deposit is not a recovery, and multiplying out of
+zero would present one.
+
+## 10. Mixing reported ROI with derived TWR
+
+Venue-published ROI is money-weighted; a TWR derived from flows is not. They
+are different quantities and ranking them against each other is the error
+every existing leaderboard makes. `entity_metrics.headline_eligible` is false
+for `nav_quality='reported'` rows, and `packages/core/src/fees.ts` is the only
+place that decides it.
+
+## 11. Open question: is Hyperliquid `pnlHistory` gross or net of leader commission?
+
+`packages/compute/src/fees.ts` treats Hyperliquid as `gross` and applies the
+recorded `leaderCommission` to the gain. If that is backwards we are
+*understating* vault returns, which for a benchmark product is the safe
+direction to be wrong in — but it is unverified. Confirm against a vault where
+the leader's realised commission can be observed independently, then update
+`FEE_BASIS` and delete this entry.
+
+## 12. Annualising an irregular series
+
+Volatility is annualised by the *observed* mean step length, not an assumed
+daily cadence. Scaling a ~biweekly Hyperliquid backfill as if it were daily
+overstates volatility by roughly √14. `volatility()` returns `meanStepDays`
+so the caveat can be stated rather than hidden.
 

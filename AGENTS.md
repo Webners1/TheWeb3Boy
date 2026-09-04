@@ -14,7 +14,9 @@ Read `docs/traps.md` before touching any adapter, job, or analytical query.
 ## Security & Authority
 
 - Never hardcode credentials or API keys. All secrets must be loaded via environment variables.
-- Database write operations must be strictly scoped. The `ingest` job is the ONLY package authorized to perform writes. Adapters in `packages/sources` must have zero database imports.
+- Database write operations must be strictly scoped. The `ingest` job is the ONLY package authorized to write raw data. Adapters in `packages/sources` must have zero database imports.
+- Derived tables (`entity_flows`, `entity_nav`, `entity_metrics`, `metric_definitions`) belong to `compute`, which must never write a raw table. See the authority note below.
+- `packages/core` performs zero I/O: no fetch, no database handle, no clock, no environment. Data goes in as arguments.
 
 ## QA & Proof (CI/CD)
 
@@ -32,10 +34,12 @@ Read `docs/traps.md` before touching any adapter, job, or analytical query.
 | Path | Purpose |
 | --- | --- |
 | `packages/db` | Drizzle schema, migrations, client. All financial columns are `numeric`. |
+| `packages/core` | Return maths, benchmarking, metric definitions. Zero I/O. |
 | `packages/sources` | Source interface + one adapter per venue. Zero database imports. |
-| `packages/ingest` | Daily snapshot job. The only package that writes to the database. |
+| `packages/ingest` | Daily snapshot job. The only package that writes raw data. |
 | `packages/backfill` | One-shot historical loaders. Writes flow through the same guarded path. |
-| `packages/shared` | Zod primitives, decimal helpers, logger, storage client. |
+| `packages/compute` | Recomputes derived tables from raw snapshots. Writes derived data only. |
+| `packages/shared` | Zod primitives, decimal helpers, logger, storage client, run guards. |
 | `docs/traps.md` | Known data traps. Update it whenever a new one is discovered. |
 
 ## Proof — which rule is enforced by what
@@ -60,6 +64,13 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | No new ORMs, queues, or wrapper layers | review-time | judgement |
 | Schema failures hard-abort the run | `packages/ingest/src/job.ts` records `ingest_runs.status='failed'` and writes nothing | automated |
 | Assert row counts against yesterday's | `packages/ingest/src/guards.test.ts` + `writeSourceBatch` | automated |
+| `packages/core` performs zero I/O | `tools/check-harness.mjs` (`core-zero-io`) | automated |
+| `compute` never writes a raw table | `tools/check-harness.mjs` (`derived-writes-only`) | automated |
+| Derived tables are rebuildable | `packages/db/src/schema.test.ts` (`derived tables are rebuildable`) | automated |
+| Every published metric has semantics in the DB | `packages/compute/src/recompute.test.ts` (`defines every published entity_metrics column`) | automated |
+| Coverage travels with every figure | `entity_metrics.days_covered`/`is_full_window`/`sampling` are `NOT NULL`, asserted in `schema.test.ts` | automated |
+| Reported ROI is excluded from headline rankings | `packages/core/src/fees.ts` `isHeadlineEligible` + `recompute.test.ts` | automated |
+| A recompute that produces nothing aborts | `evaluateRowBand` in `packages/shared` + `recompute.test.ts` | automated |
 
 The `judgement` and `pending` rows are the honest gaps. When a rule moves from
 judgement to automated, move its row and delete the exception.
@@ -71,11 +82,31 @@ without it. Add the rule to this file, add its check to `tools/check-harness.mjs
 or a package test, then confirm the check fails when the rule is violated
 before you land it.
 
-## Authority note: `ingest` vs `backfill`
+## Authority note: `ingest`, `backfill` and `compute`
 
-The rule above says `ingest` is the only package authorized to write. The
-repository also has a `backfill` package whose whole job is writing historical
-rows. These are reconciled as follows: `backfill` must not open its own
-database handle or issue its own writes — it is a thin CLI that calls
-`runBackfill` in `@vaultbench/ingest`. `scoped-db-writes` allows only `db`
-and `ingest` to import database modules.
+The rule above says database writes are strictly scoped. Three packages touch
+the database, and the boundary between them is the append-only line:
+
+- **`ingest`** owns every raw table: `entities`, `entity_snapshots`,
+  `depositors`, `benchmark_prices`, `entity_metadata_history`, `ingest_runs`.
+  These hold facts we observed once and can never re-observe.
+- **`backfill`** must not open its own database handle or issue its own
+  writes — it is a thin CLI that calls `runBackfill` in `@vaultbench/ingest`.
+- **`compute`** owns every derived table: `entity_flows`, `entity_nav`,
+  `entity_metrics`, `metric_definitions`. Every row in them is a pure function
+  of the raw tables and is safe to drop and rebuild. `derived-writes-only`
+  fails the build if `compute` mutates a raw table.
+
+`scoped-db-writes` allows only `db`, `ingest` and `compute` to import database
+modules.
+
+## Authority note: why derived NAV is not a raw column
+
+`entity_snapshots.value_per_unit` is null for Hyperliquid and OKX, and the
+per-unit series lives in `entity_nav` instead. That looks like a duplicate
+column and is not: for those venues the per-unit value is *reconstructed* from
+account value net of flows, not observed. Writing a derivation back into an
+append-only row would mean a fix to the maths silently rewrites history. With
+the derivation in its own table, a fix is a `TRUNCATE` and a rerun, and ground
+truth is never at risk. `value_per_unit` on a snapshot stays reserved for
+venues that genuinely publish one.

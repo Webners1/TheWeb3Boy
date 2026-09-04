@@ -1,4 +1,5 @@
 import {
+  boolean,
   date,
   index,
   integer,
@@ -17,6 +18,12 @@ import {
 // defect (AGENTS.md). Trap references below point at docs/traps.md.
 const money = (name: string, precision: number, scale: number) =>
   numeric(name, { precision, scale, mode: 'string' });
+
+// A return or ratio. Wider than the plan's numeric(12,6) on purpose: a vault
+// that climbed from a dust NAV to a real one produces a return above 1e6, and
+// numeric(12,6) would raise a Postgres overflow that aborts the whole
+// recompute rather than flagging one bad row.
+const rate = (name: string) => numeric(name, { precision: 20, scale: 10, mode: 'string' });
 
 export const entities = pgTable(
   'entities',
@@ -67,18 +74,6 @@ export const entitySnapshots = pgTable(
     primaryKey({ columns: [t.entityId, t.asOf] }),
     index('entity_snapshots_as_of_idx').using('brin', t.asOf),
   ],
-);
-
-export const entityFlows = pgTable(
-  'entity_flows',
-  {
-    entityId: uuid('entity_id')
-      .notNull()
-      .references(() => entities.id),
-    asOf: date('as_of', { mode: 'string' }).notNull(),
-    netFlowUsd: money('net_flow_usd', 28, 8),
-  },
-  (t) => [primaryKey({ columns: [t.entityId, t.asOf] })],
 );
 
 export const depositors = pgTable(
@@ -144,6 +139,96 @@ export const ingestRuns = pgTable('ingest_runs', {
   error: text('error'),
 });
 
+// ---------------------------------------------------------------------------
+// Derived tables. Everything below this line is a pure function of the tables
+// above and is safe to TRUNCATE and rebuild (AGENTS.md § Design principles:
+// "Raw is append-only. Derived is disposable."). Nothing here is ever the only
+// copy of a fact.
+// ---------------------------------------------------------------------------
+
+/**
+ * Deposits and withdrawals, reconstructed from consecutive snapshots as
+ * `Δaccount_value - Δcum_pnl`. Nobody publishes these directly, so they are a
+ * derivation and belong on this side of the line.
+ */
+export const entityFlows = pgTable(
+  'entity_flows',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entities.id),
+    asOf: date('as_of', { mode: 'string' }).notNull(),
+    netFlowUsd: money('net_flow_usd', 28, 8),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.entityId, t.asOf] })],
+);
+
+/**
+ * The per-unit value series — the atom every metric reads.
+ *
+ * It lives here rather than in `entity_snapshots.value_per_unit` because for
+ * Hyperliquid and OKX it is *reconstructed* from account value net of flows,
+ * not observed. Writing a derivation back into an append-only raw row would
+ * mean a fix to the maths silently rewrites history; keeping it separate means
+ * a fix is a TRUNCATE and a rerun.
+ */
+export const entityNav = pgTable(
+  'entity_nav',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entities.id),
+    asOf: date('as_of', { mode: 'string' }).notNull(),
+    valuePerUnit: money('value_per_unit', 38, 18).notNull(),
+    navQuality: text('nav_quality').notNull(), // 'reported' | 'derived'
+    method: text('method').notNull(), // 'reported' | 'simple' | 'dietz'
+    sampling: text('sampling').notNull(), // 'daily' | 'downsampled' (trap 1)
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entityId, t.asOf] }),
+    index('entity_nav_as_of_idx').using('brin', t.asOf),
+  ],
+);
+
+export const entityMetrics = pgTable(
+  'entity_metrics',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entities.id),
+    asOf: date('as_of', { mode: 'string' }).notNull(),
+    // 0 means "since inception" — see INCEPTION_WINDOW in @vaultbench/core.
+    windowDays: integer('window_days').notNull(),
+    twr: rate('twr'),
+    benchTwrBtc: rate('bench_twr_btc'),
+    benchTwrEth: rate('bench_twr_eth'),
+    benchTwrSol: rate('bench_twr_sol'),
+    alphaBtc: rate('alpha_btc'),
+    alphaEth: rate('alpha_eth'),
+    alphaSol: rate('alpha_sol'),
+    maxDrawdown: rate('max_drawdown'),
+    volatility: rate('volatility'),
+    followerMedianReturn: rate('follower_median_return'),
+    followerGap: rate('follower_gap'),
+    // Never publish a number you cannot defend: these three travel with every
+    // figure above and the UI is required to read them.
+    daysCovered: integer('days_covered').notNull(),
+    isFullWindow: boolean('is_full_window').notNull(),
+    sampling: text('sampling').notNull(),
+    navQuality: text('nav_quality'),
+    // False for venues that publish money-weighted ROI only. Such rows are
+    // excluded from headline rankings.
+    headlineEligible: boolean('headline_eligible').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entityId, t.asOf, t.windowDays] }),
+    index('entity_metrics_entity_id_window_days_idx').on(t.entityId, t.windowDays),
+  ],
+);
+
 export const metricDefinitions = pgTable('metric_definitions', {
   key: text('key').primaryKey(),
   label: text('label'),
@@ -167,5 +252,9 @@ export type EntityMetadataRow = typeof entityMetadataHistory.$inferSelect;
 export type NewEntityMetadataRow = typeof entityMetadataHistory.$inferInsert;
 export type IngestRun = typeof ingestRuns.$inferSelect;
 export type NewIngestRun = typeof ingestRuns.$inferInsert;
+export type EntityNavRow = typeof entityNav.$inferSelect;
+export type NewEntityNavRow = typeof entityNav.$inferInsert;
+export type EntityMetricsRow = typeof entityMetrics.$inferSelect;
+export type NewEntityMetricsRow = typeof entityMetrics.$inferInsert;
 export type MetricDefinition = typeof metricDefinitions.$inferSelect;
 export type NewMetricDefinition = typeof metricDefinitions.$inferInsert;

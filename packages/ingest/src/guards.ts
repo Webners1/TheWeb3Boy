@@ -1,21 +1,9 @@
-export type RowBand = 'ok' | 'aborted';
+import { RunAbortError } from '@vaultbench/shared';
 
-/**
- * Empty-array guard (trap 4). An HTTP 200 with `[]` is a valid response and
- * the failure mode that silently destroys the dataset.
- *
- * Band: rows_written must sit in [50%, 150%] of the previous successful
- * run's rows_written. Integer arithmetic only: 2*written < expected is
- * "< 50%"; 2*written > 3*expected is "> 150%".
- *
- * A first run (no expected count) is allowed unless it wrote zero rows.
- */
-export function evaluateRowBand(written: number, expected: number | null): RowBand {
-  if (written === 0) return 'aborted';
-  if (expected === null) return 'ok';
-  if (written * 2 < expected || written * 2 > expected * 3) return 'aborted';
-  return 'ok';
-}
+// The row band lives in @vaultbench/shared because the recompute job needs
+// the same guard: a derived pass that suddenly writes nothing is the same
+// silent failure as a source returning [].
+export { evaluateRowBand, type RowBand } from '@vaultbench/shared';
 
 export function shouldApplySnapshot(existingSampling: string | undefined, incomingSampling: string): boolean {
   // Never overwrite a daily row with a downsampled one.
@@ -45,12 +33,9 @@ export function metadataChanged(current: TrackedMetadata, next: TrackedMetadata)
   );
 }
 
-export class IngestAbortError extends Error {
-  readonly status: 'aborted' | 'failed';
-
+export class IngestAbortError extends RunAbortError {
   constructor(message: string, status: 'aborted' | 'failed' = 'aborted') {
-    super(message);
+    super(message, status);
     this.name = 'IngestAbortError';
-    this.status = status;
   }
 }
