@@ -271,6 +271,73 @@ const RULE_ORDER = [
   'harness-present',
 ];
 
+// ---------------------------------------------------------------------------
+// Rule 2b - No populated secrets in a committed example file.
+//
+// The no-hardcoded-secrets scan above only reads TypeScript, and this gap was
+// found the hard way: a real Enzyme API key was pasted into `.env.example` on
+// the commented `# ENZYME_API_KEY=` line, one `git add -A` away from being
+// published, and every check in this file passed.
+//
+// `.env.example` exists in order to be committed, so every assignment in it
+// must be empty or an obvious placeholder. Real values belong in `.env`,
+// which is gitignored.
+// ---------------------------------------------------------------------------
+const EXAMPLE_ENV = path.join(repoRoot, '.env.example');
+
+/**
+ * Detected by variable *name*, not by the shape of the value.
+ *
+ * Guessing from the value was the first attempt and it was wrong in both
+ * directions: it flagged `S3_REGION=auto` and `S3_FORCE_PATH_STYLE=true`,
+ * which are documentation, while any rule loose enough to let those through
+ * would also let through a short API key. The name is the reliable signal —
+ * a variable called `*_KEY` has no business carrying a value in a file whose
+ * entire purpose is to be committed.
+ */
+const SECRET_NAME = /(?:_KEY|_KEY_ID|_TOKEN|_SECRET|SECRET_|PASSWORD|PASSWD|_CREDENTIALS?)$|^(?:.*_)?(?:APIKEY|TOKEN|SECRET)$/;
+
+/** A connection string with an embedded password pointing somewhere real. */
+const REMOTE_CREDENTIAL_URL = /^[a-z][a-z0-9+.-]*:\/\/[^:@\s/]+:[^@\s/]+@([^/:\s]+)/;
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', 'postgres', 'db', 'host.docker.internal']);
+
+if (existsSync(EXAMPLE_ENV)) {
+  readFileSync(EXAMPLE_ENV, 'utf8')
+    .split(/\r?\n/)
+    .forEach((line, index) => {
+      // Commented-out settings count. That is exactly where the key landed:
+      // pasted onto the `# ENZYME_API_KEY=` line, still committable.
+      const match = /^\s*#?\s*([A-Z][A-Z0-9_]*)\s*=(.*)$/.exec(line);
+      if (match === null) return;
+      const name = match[1] ?? '';
+      const value = (match[2] ?? '').trim();
+      if (value === '') return;
+
+      const where = `line ${index + 1}: ${name}`;
+      if (SECRET_NAME.test(name)) {
+        fail(
+          'no-hardcoded-secrets',
+          EXAMPLE_ENV,
+          `${where} carries a value in a committed file; real secrets go in .env, ` +
+            'which is gitignored, and the example line stays empty',
+        );
+        return;
+      }
+
+      // A local throwaway default is the point of an example file; a
+      // credential for a host someone can actually reach is not.
+      const url = REMOTE_CREDENTIAL_URL.exec(value);
+      if (url !== null && !LOCAL_HOSTS.has(url[1] ?? '')) {
+        fail(
+          'no-hardcoded-secrets',
+          EXAMPLE_ENV,
+          `${where} embeds a password for non-local host "${url[1]}"; ` +
+            'the example may only default to a local service',
+        );
+      }
+    });
+}
+
 if (violations.length === 0) {
   console.log(`harness: OK — ${scanTargets.length} files checked, 0 violations`);
   process.exit(0);

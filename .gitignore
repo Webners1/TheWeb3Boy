@@ -5,3 +5,8 @@ coverage/
 .env
 *.log
 var/
+
+# Agent tooling artifacts, per-machine.
+.agents/
+.claude/
+skills-lock.json

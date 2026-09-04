@@ -59,7 +59,7 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | An unconfigured source is skipped, never reported as an empty universe | `packages/sources/src/enzyme/adapter.test.ts` | automated |
 | Money columns are Postgres `numeric` | `packages/db/src/schema.test.ts` | automated |
 | Numeric reaches TypeScript as `string` | `packages/db/src/schema.test.ts` | automated |
-| Never hardcode credentials or API keys | `tools/check-harness.mjs` (`no-hardcoded-secrets`) | automated |
+| Never hardcode credentials or API keys | `tools/check-harness.mjs` (`no-hardcoded-secrets`), over `packages/**`, `tools/**` *and* `.env.example` | automated |
 | `packages/sources` has zero database imports | `packages/sources/src/authority.test.ts` | automated |
 | Database writes are strictly scoped | `tools/check-harness.mjs` (`scoped-db-writes`) | automated |
 | Raw payloads are append-only | `LocalFileArchive.put` opens with `wx`; snapshots are keyed `(entity_id, as_of)` | automated |
@@ -98,6 +98,15 @@ A new rule is not done when it is written here. It is done when a check fails
 without it. Add the rule to this file, add its check to `tools/check-harness.mjs`
 or a package test, then confirm the check fails when the rule is violated
 before you land it.
+
+State what each check *looks at*, not only that it exists. A row reading
+`automated` is not proof on its own: `no-hardcoded-secrets` was marked
+automated from the first commit and scanned only `.ts` files, so a real API
+key pasted into `.env.example` — the file that documents which secrets exist,
+and the likeliest place for a human to put one — passed every check in the
+repository. The rule was right and the enforcement was pointed at the wrong
+file set. When you add a rule, ask where the mistake would actually be made,
+and confirm the check reaches there. See trap 22.
 
 ## Authority note: `ingest`, `backfill` and `compute`
 

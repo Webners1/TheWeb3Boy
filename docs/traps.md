@@ -312,3 +312,87 @@ code was quietly mapped to a different, *wrong* value. Here the two spellings
 are the same field by the vendor's own spec, nothing is invented, and a third
 spelling still fails the parse.
 
+
+## 21. Open: alpha over a benchmark is meaningless without leverage
+
+Verified against real data, and it is the first thing a reader will see.
+
+The top entity by 90-day TWR in the current Chamber universe is a vault named
+"Ethereum Bull 3X". Its published figures are all correct:
+
+| field | value |
+| --- | --- |
+| `twr` | 2.21 |
+| `bench_twr_eth` | 0.48 |
+| `alpha_eth` | 1.74 |
+| `volatility` | 1.89 |
+| `max_drawdown` | 0.43 |
+| `strategy_category` | `null` |
+
+Every number there is arithmetically right. `alpha_eth` of 1.74 is also
+analytically worthless: the vault is a 3x leveraged long on the very
+benchmark it is being compared against. That is not 174 points of manager
+skill, it is beta times three in a rising market. The same vault in a falling
+market would print a spectacular negative alpha for the same reason, and
+neither figure says anything about the manager.
+
+Coverage travels with every figure (`days_covered`, `is_full_window`,
+`sampling`, `nav_quality`) — but **leverage and market exposure do not**. The
+metric that most invites a ranking is the one with the least disclosure
+attached.
+
+`strategy_category` was built for exactly this and is `null` here, because it
+is hand-tagged and nothing has tagged the Chamber universe yet
+(`data/strategy-tags.json`). A category of `directional` would let the reader
+know the comparison is apples-to-apples-with-a-multiplier. It still would not
+carry the multiplier.
+
+This is unresolved, and it must be resolved before an entity card ranks
+anything, because a chart is far more persuasive than a JSON field. The
+options, none yet chosen:
+
+1. Publish beta against each benchmark alongside alpha. Computable from data
+   already held, in `packages/core`, with no new source. Makes the leverage
+   visible as a number rather than as a vault name.
+2. Require `strategy_category` to be non-null for `headline_eligible`. Honest,
+   and it empties the rankings until the tagging is done.
+3. Rank on a risk-adjusted figure rather than raw TWR, so 189% volatility
+   costs the vault its top spot.
+
+Option 1 is the cheapest and the least presumptuous, and it does not preclude
+the others. Whatever is chosen, "Ethereum Bull 3X tops the table with 174
+points of alpha over ETH" must not be a sentence this project can be quoted
+as saying.
+
+## 22. A secret scanner that only reads code is not a secret scanner
+
+Found the hard way, during this build. A real Enzyme API key was pasted into
+`.env.example` — onto the commented `# ENZYME_API_KEY=` line, which reads as
+inert and is not. `.env.example` exists in order to be committed. The key was
+one `git add -A` away from being published, and **every check in this
+repository passed**, because `no-hardcoded-secrets` only ever scanned `.ts`
+files under `packages/` and `tools/`.
+
+The rule was real, the enforcement had a hole exactly where a human would
+actually put a secret: in the file that documents which secrets exist.
+
+`tools/check-harness.mjs` now also scans `.env.example` for populated
+assignments, including commented ones. Two things learned while writing it:
+
+- **Detect by variable name, not by the shape of the value.** The first
+  attempt inspected values and was wrong in both directions: it flagged
+  `S3_REGION=auto` and `S3_FORCE_PATH_STYLE=true`, which are documentation,
+  and any rule loose enough to permit those would also permit a short API
+  key. A variable named `*_KEY` has no business carrying a value in a
+  committed file, whatever that value looks like.
+- **A local default is the point of an example file; a reachable one is not.**
+  `DATABASE_URL=postgres://postgres:postgres@localhost:5432/vaultbench` is
+  useful and safe. The same line pointing at a host someone can resolve is a
+  leak, so an embedded password is allowed only for a local host.
+
+The general lesson, which is not about env files: when a rule is written
+down, check the enforcement covers the place the mistake would actually be
+made. `no-hardcoded-secrets` was listed as `automated` in AGENTS.md and had
+been since the first commit. It was automated over the wrong file set, and
+nothing in the proof table could reveal that, because the table records
+whether a check exists and not what it looks at.
