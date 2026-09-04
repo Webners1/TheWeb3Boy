@@ -296,6 +296,98 @@ describe('recompute', () => {
     expect(row?.headlineEligible).toBe(false);
   });
 
+  it('holds a scraped entity out of headline rankings even when the venue is verified', async () => {
+    const db = await createTestDb();
+    const [entity] = await db
+      .insert(entities)
+      .values({
+        source: 'hyperliquid',
+        externalId: '0xscraped',
+        kind: 'vault',
+        name: 'Scraped Vault',
+        venue: 'hyperliquid',
+        venueType: 'dex',
+        marketType: 'perp',
+        baseCurrency: 'USDC',
+        status: 'active',
+        provenance: 'scraped',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .returning({ id: entities.id });
+    if (!entity) throw new Error('seed failed');
+
+    await db.insert(entitySnapshots).values([
+      {
+        entityId: entity.id,
+        asOf: '2026-01-01',
+        valuePerUnit: '1.000000000000000000',
+        sampling: 'daily',
+        navQuality: 'reported',
+        fetchedAt: now,
+      },
+      {
+        entityId: entity.id,
+        asOf: '2026-01-04',
+        valuePerUnit: '1.500000000000000000',
+        sampling: 'daily',
+        navQuality: 'reported',
+        fetchedAt: now,
+      },
+    ]);
+
+    await recompute({ db, source: 'hyperliquid', windows: [INCEPTION_WINDOW] });
+    const [row] = await db.select().from(entityMetrics).where(eq(entityMetrics.entityId, entity.id));
+    expect(row?.twr).toBe('0.5000000000');
+    expect(row?.headlineEligible).toBe(false);
+  });
+
+  it('holds a wallet out of headline rankings even when the number is reported', async () => {
+    const db = await createTestDb();
+    const [entity] = await db
+      .insert(entities)
+      .values({
+        source: 'hyperliquid',
+        externalId: 'wallet-1',
+        kind: 'wallet',
+        name: 'A wallet',
+        venue: 'solana',
+        venueType: 'dex',
+        marketType: 'spot',
+        baseCurrency: 'USDC',
+        status: 'active',
+        provenance: 'api',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .returning({ id: entities.id });
+    if (!entity) throw new Error('seed failed');
+
+    await db.insert(entitySnapshots).values([
+      {
+        entityId: entity.id,
+        asOf: '2026-01-01',
+        valuePerUnit: '1.000000000000000000',
+        sampling: 'daily',
+        navQuality: 'reported',
+        fetchedAt: now,
+      },
+      {
+        entityId: entity.id,
+        asOf: '2026-01-04',
+        valuePerUnit: '2.000000000000000000',
+        sampling: 'daily',
+        navQuality: 'reported',
+        fetchedAt: now,
+      },
+    ]);
+
+    await recompute({ db, source: 'hyperliquid', windows: [INCEPTION_WINDOW] });
+    const [row] = await db.select().from(entityMetrics).where(eq(entityMetrics.entityId, entity.id));
+    expect(row?.twr).toBe('1.0000000000');
+    expect(row?.headlineEligible).toBe(false);
+  });
+
   it('computes the lead-versus-follower gap from the depositor cross-section', async () => {
     const db = await createTestDb();
     const entityId = await seed(db);

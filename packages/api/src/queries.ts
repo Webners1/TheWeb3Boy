@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte, max } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte, max, ne } from 'drizzle-orm';
 import {
   benchmarkPrices,
   depositors,
@@ -6,9 +6,13 @@ import {
   entityFlows,
   entityMetrics,
   entityNav,
+  entitySnapshots,
   metricDefinitions,
   type Db,
 } from '@vaultbench/db';
+
+/** Instruments that may share a ranking. Wallets are a different animal. */
+export const RANKING_KINDS = ['vault', 'lead_trader'] as const;
 
 /**
  * Every read the API performs, in one file.
@@ -46,7 +50,13 @@ const SORT_COLUMNS = {
 function entityConditions(filter: EntityFilter) {
   const conditions = [];
   if (filter.source !== undefined) conditions.push(eq(entities.source, filter.source));
-  if (filter.kind !== undefined) conditions.push(eq(entities.kind, filter.kind));
+  if (filter.kind !== undefined) {
+    conditions.push(eq(entities.kind, filter.kind));
+  } else {
+    // A wallet must never appear in a list that also includes vaults or
+    // lead traders. Asking for kind=wallet is the only way to see them.
+    conditions.push(inArray(entities.kind, [...RANKING_KINDS]));
+  }
   if (filter.status !== undefined) conditions.push(eq(entities.status, filter.status));
   if (filter.marketType !== undefined) conditions.push(eq(entities.marketType, filter.marketType));
   if (filter.strategyCategory !== undefined) {
@@ -99,6 +109,9 @@ export async function listEntities(
   const conditions = entityConditions(filter);
   if (filter.headlineEligibleOnly === true) {
     conditions.push(eq(entityMetrics.headlineEligible, true));
+    // Defense in depth: even a stale row that still says eligible cannot
+    // put a scrape on a headline board beside an API-derived vault.
+    conditions.push(ne(entities.provenance, 'scraped'));
   }
   if (filter.fullWindowOnly === true) {
     conditions.push(eq(entityMetrics.isFullWindow, true));
@@ -141,6 +154,47 @@ export async function listEntities(
   const totalRows = await (where === undefined ? totals : totals.where(where));
 
   return { rows, total: Number(totalRows[0]?.value ?? 0) };
+}
+
+export async function latestSnapshotExtras(
+  db: Db,
+  entityIds: readonly string[],
+): Promise<Map<string, { managerStakeRatio: string | null; pendingRedemptionsUsd: string | null }>> {
+  const extras = new Map<
+    string,
+    { managerStakeRatio: string | null; pendingRedemptionsUsd: string | null }
+  >();
+  if (entityIds.length === 0) return extras;
+
+  const newest = db
+    .select({
+      entityId: entitySnapshots.entityId,
+      asOf: max(entitySnapshots.asOf).as('newest_snap_as_of'),
+    })
+    .from(entitySnapshots)
+    .where(inArray(entitySnapshots.entityId, [...entityIds]))
+    .groupBy(entitySnapshots.entityId)
+    .as('newest_snap');
+
+  const rows = await db
+    .select({
+      entityId: entitySnapshots.entityId,
+      managerStakeRatio: entitySnapshots.managerStakeRatio,
+      pendingRedemptionsUsd: entitySnapshots.pendingRedemptionsUsd,
+    })
+    .from(entitySnapshots)
+    .innerJoin(
+      newest,
+      and(eq(entitySnapshots.entityId, newest.entityId), eq(entitySnapshots.asOf, newest.asOf)),
+    );
+
+  for (const row of rows) {
+    extras.set(row.entityId, {
+      managerStakeRatio: row.managerStakeRatio,
+      pendingRedemptionsUsd: row.pendingRedemptionsUsd,
+    });
+  }
+  return extras;
 }
 
 export async function findEntity(

@@ -15,6 +15,7 @@ import {
   okxStatsSchema,
   okxSubpositionHistorySchema,
 } from './okx/schemas.js';
+import { solanaRpcEnvelopeSchema } from './drift/schemas.js';
 
 describe('hyperliquid fixtures', () => {
   it('parses the captured stats registry sample', () => {
@@ -97,5 +98,29 @@ describe('okx fixtures', () => {
       loadFixture('okx/subpositions-history.json'),
       'history',
     );
+  });
+});
+
+describe('drift rpc envelope', () => {
+  it('accepts a getProgramAccounts result and rejects a vault-shaped error', () => {
+    parseOrThrow(
+      solanaRpcEnvelopeSchema,
+      {
+        jsonrpc: '2.0',
+        result: [
+          {
+            pubkey: 'vAuLTsyrvSfZRuRB3XgvkPwNGgYSs9YRYymVebLKoxR',
+            account: { data: ['AQID', 'base64'] },
+          },
+        ],
+      },
+      'drift rpc',
+    );
+    const parsed = parseOrThrow(
+      solanaRpcEnvelopeSchema,
+      { jsonrpc: '2.0', error: { code: -32000, message: 'too many accounts' } },
+      'drift rpc error',
+    );
+    expect(parsed.error?.message).toBe('too many accounts');
   });
 });

@@ -85,6 +85,11 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Money-weighted ROI is excluded from headline rankings | `packages/core/src/fees.ts` `isHeadlineEligible` + `recompute.test.ts` | automated |
 | Alpha never travels without beta | `alpha_*` caveats name `beta_*` in `metric-definitions.ts`; `packages/core/src/beta.test.ts` | automated |
 | An unverified venue is not ranked | `isSourceRankable` in `packages/compute/src/fees.ts` + `recompute.test.ts` | automated |
+| A scraped entity is never headline-ranked beside an API entity | `isHeadlineRankable` in `packages/compute/src/fees.ts` + `recompute.test.ts` + `packages/api/src/app.test.ts` | automated |
+| A wallet never shares a ranking with a vault or lead trader | `RANKING_KINDS` in `packages/api/src/queries.ts` + `app.test.ts`; `kind !== 'wallet'` in `isHeadlineRankable` | automated |
+| Drift share price is equity / total shares, never invented | `packages/sources/src/drift/adapter.test.ts` (five-vault reconciliation; omitted without equity) | automated |
+| Drift fees are net (share dilution) | `FEE_BASIS.drift = 'net'` in `packages/compute/src/fees.ts` | automated |
+| `manager_stake_ratio` is a snapshot column, numeric | `packages/db/src/schema.test.ts` + Hyperliquid `leaderFraction` in `hyperliquid/adapter.test.ts` | automated |
 | Strategy categories are hand-assigned, never guessed | `packages/ingest/src/strategy-tags.test.ts` | automated |
 | Chamber chain codes are checked against the response | `packages/sources/src/chamber/adapter.test.ts` | automated |
 | Chamber fee numerators are basis points | `chamberFundSchema` refine + `chamber/adapter.test.ts` | automated |

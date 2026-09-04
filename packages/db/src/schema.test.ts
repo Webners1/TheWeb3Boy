@@ -17,6 +17,7 @@ const REQUIRED_TABLES = [
   'depositors',
   'benchmark_prices',
   'entity_metadata_history',
+  'fee_schedule',
   'ingest_runs',
   'metric_definitions',
   'entity_nav',
@@ -31,7 +32,15 @@ const FLOAT_COLUMN_TYPES = ['PgReal', 'PgDoublePrecision'];
 
 /** Every column that holds a monetary or rate value, by table. */
 const MONEY_COLUMNS: Record<string, string[]> = {
-  entity_snapshots: ['value_per_unit', 'account_value', 'cum_pnl', 'aum_usd'],
+  entity_snapshots: [
+    'value_per_unit',
+    'account_value',
+    'cum_pnl',
+    'aum_usd',
+    'manager_stake_ratio',
+    'pending_redemptions_usd',
+  ],
+  fee_schedule: ['management_fee', 'performance_fee'],
   entity_flows: ['net_flow_usd'],
   depositors: ['equity', 'pnl', 'all_time_pnl'],
   benchmark_prices: ['close_usd'],

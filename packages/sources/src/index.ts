@@ -16,4 +16,6 @@ export {
   parseExternalId as parseEnzymeExternalId,
   type EnzymeDeployment,
 } from './enzyme/adapter.js';
+export { DriftSource } from './drift/adapter.js';
+export { DRIFT_VAULTS_PROGRAM_ID } from './drift/account.js';
 export { parseOrThrow } from './parse.js';

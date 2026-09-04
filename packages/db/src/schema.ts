@@ -31,7 +31,7 @@ export const entities = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     source: text('source').notNull(), // 'hyperliquid' | 'okx' | 'defillama'
     externalId: text('external_id').notNull(),
-    kind: text('kind').notNull(), // 'vault' | 'lead_trader'
+    kind: text('kind').notNull(), // 'vault' | 'lead_trader' | 'wallet'
     name: text('name').notNull(),
     venue: text('venue').notNull(),
     venueType: text('venue_type').notNull(), // 'cex' | 'dex'
@@ -41,6 +41,11 @@ export const entities = pgTable(
     inceptionDate: date('inception_date', { mode: 'string' }),
     parentEntityId: uuid('parent_entity_id').references((): AnyPgColumn => entities.id),
     status: text('status').notNull(), // 'active' | 'closed' | 'delisted'
+    // How the row was obtained. Scraped entities are stored but never
+    // headline-ranked beside API rows — enforced in compute and the API.
+    provenance: text('provenance').notNull().default('api'), // 'api' | 'partner' | 'scraped'
+    copyMode: text('copy_mode'), // 'classic' | 'pro' | 'tradfi' | 'spot' | 'futures' | 'bot'
+    positionsVisible: boolean('positions_visible'),
     firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
   },
@@ -64,6 +69,10 @@ export const entitySnapshots = pgTable(
     // Cumulative since inception; never difference it (trap 2).
     cumPnl: money('cum_pnl', 28, 8),
     aumUsd: money('aum_usd', 20, 2),
+    // Drift: (totalShares - userShares) / totalShares. Hyperliquid: leaderFraction.
+    managerStakeRatio: money('manager_stake_ratio', 12, 8),
+    // Drift: outstanding withdraw requests, USD when the deposit asset is USDC.
+    pendingRedemptionsUsd: money('pending_redemptions_usd', 28, 8),
     // 'daily' | 'downsampled' — Hyperliquid allTime rows are downsampled (trap 1).
     sampling: text('sampling').notNull(),
     navQuality: text('nav_quality').notNull(), // 'reported' | 'derived' | 'raw'
@@ -122,6 +131,25 @@ export const entityMetadataHistory = pgTable(
     feeManagement: money('fee_management', 6, 4),
     leaderCommission: money('leader_commission', 6, 4),
     status: text('status'),
+  },
+  (t) => [primaryKey({ columns: [t.entityId, t.validFrom] })],
+);
+
+/**
+ * Fee terms as observed, keyed so a later change is a new row rather than an
+ * overwrite. Ingest owns this table; it is raw, not derived.
+ */
+export const feeSchedule = pgTable(
+  'fee_schedule',
+  {
+    entityId: uuid('entity_id')
+      .notNull()
+      .references(() => entities.id),
+    validFrom: date('valid_from', { mode: 'string' }).notNull(),
+    managementFee: money('management_fee', 6, 4),
+    performanceFee: money('performance_fee', 6, 4),
+    redemptionPeriodDays: integer('redemption_period_days'),
+    highWaterMark: boolean('high_water_mark'),
   },
   (t) => [primaryKey({ columns: [t.entityId, t.validFrom] })],
 );
@@ -263,6 +291,8 @@ export type BenchmarkPrice = typeof benchmarkPrices.$inferSelect;
 export type NewBenchmarkPrice = typeof benchmarkPrices.$inferInsert;
 export type EntityMetadataRow = typeof entityMetadataHistory.$inferSelect;
 export type NewEntityMetadataRow = typeof entityMetadataHistory.$inferInsert;
+export type FeeScheduleRow = typeof feeSchedule.$inferSelect;
+export type NewFeeScheduleRow = typeof feeSchedule.$inferInsert;
 export type IngestRun = typeof ingestRuns.$inferSelect;
 export type NewIngestRun = typeof ingestRuns.$inferInsert;
 export type EntityNavRow = typeof entityNav.$inferSelect;

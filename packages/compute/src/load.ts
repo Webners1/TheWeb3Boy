@@ -25,6 +25,7 @@ export interface EntityRow {
   kind: string;
   strategyCategory: string | null;
   status: string;
+  provenance: string;
 }
 
 export async function loadEntities(db: Db, source?: string): Promise<EntityRow[]> {
@@ -37,6 +38,7 @@ export async function loadEntities(db: Db, source?: string): Promise<EntityRow[]
       kind: entities.kind,
       strategyCategory: entities.strategyCategory,
       status: entities.status,
+      provenance: entities.provenance,
     })
     .from(entities);
 

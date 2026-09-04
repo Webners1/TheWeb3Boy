@@ -397,3 +397,115 @@ describe('spec', () => {
     expect(Object.keys(body.paths)).toContain('/compare');
   });
 });
+
+describe('ranking gates', () => {
+  let gatedGet: typeof get;
+
+  beforeAll(async () => {
+    const client = new PGlite();
+    await applyMigrations(client);
+    const gatedDb = drizzle(client) as unknown as Db;
+
+    const inserted = await gatedDb
+      .insert(entities)
+      .values([
+        {
+          source: 'hyperliquid',
+          externalId: '0xvault',
+          kind: 'vault',
+          name: 'API Vault',
+          venue: 'hyperliquid',
+          venueType: 'dex',
+          marketType: 'perp',
+          baseCurrency: 'USDC',
+          status: 'active',
+          provenance: 'api',
+          firstSeenAt: now,
+          lastSeenAt: now,
+        },
+        {
+          source: 'hyperliquid',
+          externalId: '0xscraped',
+          kind: 'vault',
+          name: 'Scraped Vault',
+          venue: 'hyperliquid',
+          venueType: 'dex',
+          marketType: 'perp',
+          baseCurrency: 'USDC',
+          status: 'active',
+          provenance: 'scraped',
+          firstSeenAt: now,
+          lastSeenAt: now,
+        },
+        {
+          source: 'solana',
+          externalId: 'wallet-1',
+          kind: 'wallet',
+          name: 'Hot Wallet',
+          venue: 'solana',
+          venueType: 'dex',
+          marketType: 'spot',
+          baseCurrency: 'SOL',
+          status: 'active',
+          provenance: 'api',
+          firstSeenAt: now,
+          lastSeenAt: now,
+        },
+      ])
+      .returning({ id: entities.id, name: entities.name });
+
+    const byName = new Map(inserted.map((row) => [row.name, row.id]));
+    const vaultId = byName.get('API Vault');
+    const scrapedId = byName.get('Scraped Vault');
+    const walletId = byName.get('Hot Wallet');
+    if (!vaultId || !scrapedId || !walletId) throw new Error('gate seed failed');
+
+    await gatedDb.insert(entityMetrics).values(
+      [vaultId, scrapedId, walletId].map((entityId, index) => ({
+        entityId,
+        asOf: '2026-01-04',
+        windowDays: INCEPTION_WINDOW,
+        twr: index === 1 ? '9.0000000000' : '0.1000000000',
+        daysCovered: 4,
+        isFullWindow: true,
+        sampling: 'daily',
+        navQuality: 'reported',
+        // Compute would have cleared these; the query layer must not trust
+        // a stale true on a scrape or a wallet.
+        headlineEligible: true,
+        feesApplied: false,
+        computedAt: now,
+      })),
+    );
+
+    const gatedApp = createApp({ db: gatedDb });
+    gatedGet = async (path: string) => {
+      const response = await gatedApp.request(`http://localhost${path}`);
+      const text = await response.text();
+      return { status: response.status, body: text.length > 0 ? JSON.parse(text) : null };
+    };
+  });
+
+  it('excludes wallets from every mixed list', async () => {
+    const { body } = await gatedGet('/entities');
+    const names = body.entities.map((entity: { name: string }) => entity.name);
+    expect(names).toContain('API Vault');
+    expect(names).toContain('Scraped Vault');
+    expect(names).not.toContain('Hot Wallet');
+  });
+
+  it('serves wallets only when kind=wallet is asked for', async () => {
+    const { body } = await gatedGet('/entities?kind=wallet');
+    expect(body.entities).toHaveLength(1);
+    expect(body.entities[0].name).toBe('Hot Wallet');
+  });
+
+  it('excludes scraped entities from headlineEligible lists even if the flag is set', async () => {
+    const unfiltered = await gatedGet('/entities?sort=twr&direction=desc');
+    expect(unfiltered.body.entities[0].name).toBe('Scraped Vault');
+
+    const ranked = await gatedGet('/entities?sort=twr&direction=desc&headlineEligible=true');
+    const names = ranked.body.entities.map((entity: { name: string }) => entity.name);
+    expect(names).toEqual(['API Vault']);
+  });
+});

@@ -29,6 +29,9 @@ const FEE_BASIS: Record<string, FeeBasis> = {
   // dHEDGE takes its performance fee by minting manager shares, which
   // dilutes the token price. The published price is therefore already net.
   chamber: 'net',
+  // Drift takes management and performance fees as shares minted to the
+  // manager, same dilution mechanism as Chamber. The share price is net.
+  drift: 'net',
 };
 
 /**
@@ -47,11 +50,34 @@ const RANKABLE: Record<string, boolean> = {
   hyperliquid: true,
   chamber: true,
   enzyme: true,
+  drift: true,
   okx: false,
 };
 
 export function isSourceRankable(source: string): boolean {
   return RANKABLE[source] ?? false;
+}
+
+/**
+ * Headline ranking is four independent nos, any one of which is enough:
+ * the number's quality, the venue's verified semantics, how we obtained
+ * the row, and whether the instrument is even the same kind of thing.
+ *
+ * Wallets and scrapes are stored. They are never ranked beside a vault
+ * that came from a documented API.
+ */
+export function isHeadlineRankable(input: {
+  source: string;
+  provenance: string;
+  kind: string;
+  navEligible: boolean;
+}): boolean {
+  return (
+    input.navEligible &&
+    isSourceRankable(input.source) &&
+    input.provenance !== 'scraped' &&
+    input.kind !== 'wallet'
+  );
 }
 
 export interface RecordedFees {

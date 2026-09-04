@@ -92,6 +92,24 @@ export const entitySchema = z
         'dropping them is how a leaderboard invents survivorship bias.',
       example: 'active',
     }),
+    provenance: z.string().openapi({
+      description:
+        '`api`, `partner` or `scraped`. A scraped entity is stored but never ' +
+        'headline-ranked beside an API-derived one.',
+      example: 'api',
+    }),
+    copyMode: z.string().nullable().openapi({
+      description: '`classic`, `pro`, `tradfi`, `spot`, `futures`, `bot`, or null.',
+    }),
+    positionsVisible: z.boolean().nullable().openapi({
+      description: 'False when the venue keeps the lead\'s positions opaque (e.g. Bybit Pro).',
+    }),
+    managerStakeRatio: decimalString.nullable().openapi({
+      description:
+        'Manager capital at risk as a fraction of vault equity. Drift: ' +
+        '(totalShares − userShares) / totalShares. Hyperliquid: leaderFraction.',
+    }),
+    pendingRedemptionsUsd: decimalString.nullable(),
     firstSeenAt: z.string(),
     lastSeenAt: z.string(),
   })

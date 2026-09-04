@@ -124,6 +124,7 @@ const RAW_TABLES = [
   'depositors',
   'benchmarkPrices',
   'entityMetadataHistory',
+  'feeSchedule',
 ];
 const MUTATIONS = ['insert', 'update', 'delete'];
 

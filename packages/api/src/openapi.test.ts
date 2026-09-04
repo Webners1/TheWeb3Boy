@@ -77,6 +77,8 @@ describe('money never crosses the wire as a float', () => {
     ['NavPoint', 'valuePerUnit'],
     ['IndexPoint', 'value'],
     ['Follower', 'equity'],
+    ['Entity', 'managerStakeRatio'],
+    ['Entity', 'pendingRedemptionsUsd'],
   ] as const;
 
   it.each(moneyFields)('%s.%s is a string', (schema, field) => {

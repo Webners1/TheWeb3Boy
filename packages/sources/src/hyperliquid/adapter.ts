@@ -1,4 +1,5 @@
 import {
+  Decimal,
   dateFromEpochMillis,
   decimalFromJsonNumber,
   fetchJson,
@@ -92,6 +93,7 @@ export class HyperliquidSource implements Source {
         accountValue: parseDecimal(point.accountValue),
         cumPnl: parseDecimal(point.cumPnl),
         aumUsd: parseDecimal(entry.summary.tvl),
+        managerStakeRatio: new Decimal(String(detail.leaderFraction)),
         sampling: 'daily',
         navQuality: 'raw',
         // The day point comes from the per-vault detail call, not the

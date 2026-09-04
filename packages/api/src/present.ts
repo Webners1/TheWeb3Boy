@@ -32,7 +32,12 @@ function navQuality(value: string | null): NavQuality | null {
   return null;
 }
 
-export function presentEntity(row: EntityRow) {
+export interface SnapshotExtras {
+  managerStakeRatio: string | null;
+  pendingRedemptionsUsd: string | null;
+}
+
+export function presentEntity(row: EntityRow, extras?: SnapshotExtras) {
   return {
     id: row.id,
     source: row.source,
@@ -46,6 +51,11 @@ export function presentEntity(row: EntityRow) {
     baseCurrency: row.baseCurrency,
     inceptionDate: row.inceptionDate,
     status: row.status,
+    provenance: row.provenance,
+    copyMode: row.copyMode,
+    positionsVisible: row.positionsVisible,
+    managerStakeRatio: trimNumeric(extras?.managerStakeRatio ?? null),
+    pendingRedemptionsUsd: trimNumeric(extras?.pendingRedemptionsUsd ?? null),
     firstSeenAt: row.firstSeenAt.toISOString(),
     lastSeenAt: row.lastSeenAt.toISOString(),
   };

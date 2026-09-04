@@ -5,6 +5,7 @@ import {
   entities,
   entityMetadataHistory,
   entitySnapshots,
+  feeSchedule,
   ingestRuns,
   type Db,
 } from '@vaultbench/db';
@@ -90,6 +91,7 @@ export async function writeSourceBatch(db: Db, batch: SourceBatch): Promise<{ ru
       );
       await replaceDepositors(tx, batch, idByExternal, asOf);
       await applyMetadata(tx, batch, idByExternal, asOf, yesterday);
+      await applyFeeSchedule(tx, batch.entities, idByExternal, asOf);
     });
 
     await db
@@ -141,6 +143,9 @@ async function upsertEntities(tx: Tx, batch: SourceBatch): Promise<Map<string, s
       // classifies it, and null is honest.
       strategyCategory: strategyCategoryFor(entity.source, entity.externalId),
       status: entity.status,
+      provenance: entity.provenance ?? 'api',
+      copyMode: entity.copyMode ?? null,
+      positionsVisible: entity.positionsVisible ?? null,
       firstSeenAt: batch.fetchedAt,
       lastSeenAt: batch.fetchedAt,
     };
@@ -159,6 +164,9 @@ async function upsertEntities(tx: Tx, batch: SourceBatch): Promise<Map<string, s
           inceptionDate: values.inceptionDate,
           strategyCategory: values.strategyCategory,
           status: values.status,
+          provenance: values.provenance,
+          copyMode: values.copyMode,
+          positionsVisible: values.positionsVisible,
           lastSeenAt: values.lastSeenAt,
         },
       })
@@ -293,6 +301,8 @@ async function upsertSnapshots(
       accountValue: money(snapshot.accountValue, 8),
       cumPnl: money(snapshot.cumPnl, 8),
       aumUsd: money(snapshot.aumUsd, 2),
+      managerStakeRatio: money(snapshot.managerStakeRatio, 8),
+      pendingRedemptionsUsd: money(snapshot.pendingRedemptionsUsd, 8),
       sampling: snapshot.sampling,
       navQuality: snapshot.navQuality,
       fetchedAt: ctx.fetchedAt,
@@ -318,6 +328,8 @@ async function upsertSnapshots(
           accountValue: sql.raw('excluded.account_value'),
           cumPnl: sql.raw('excluded.cum_pnl'),
           aumUsd: sql.raw('excluded.aum_usd'),
+          managerStakeRatio: sql.raw('excluded.manager_stake_ratio'),
+          pendingRedemptionsUsd: sql.raw('excluded.pending_redemptions_usd'),
           sampling: sql.raw('excluded.sampling'),
           navQuality: sql.raw('excluded.nav_quality'),
           fetchedAt: sql.raw('excluded.fetched_at'),
@@ -448,6 +460,73 @@ async function applyMetadata(
   }
 }
 
+interface TrackedFeeSchedule {
+  managementFee: string | null;
+  performanceFee: string | null;
+  redemptionPeriodDays: number | null;
+  highWaterMark: boolean | null;
+}
+
+async function applyFeeSchedule(
+  tx: Tx,
+  descriptors: readonly EntityDescriptor[],
+  idByExternal: Map<string, string>,
+  asOf: string,
+): Promise<void> {
+  for (const entity of descriptors) {
+    if (entity.feeSchedule === undefined) continue;
+    const entityId = idByExternal.get(entity.externalId);
+    if (!entityId) continue;
+
+    const next: TrackedFeeSchedule = {
+      managementFee: money(entity.feeSchedule.managementFee, 4),
+      performanceFee: money(entity.feeSchedule.performanceFee, 4),
+      redemptionPeriodDays: entity.feeSchedule.redemptionPeriodDays ?? null,
+      highWaterMark: entity.feeSchedule.highWaterMark ?? null,
+    };
+
+    const open = await tx
+      .select()
+      .from(feeSchedule)
+      .where(eq(feeSchedule.entityId, entityId))
+      .orderBy(desc(feeSchedule.validFrom))
+      .limit(1);
+
+    const current = open[0];
+    if (!current) {
+      await tx.insert(feeSchedule).values({ entityId, validFrom: asOf, ...next });
+      continue;
+    }
+
+    const currentTracked: TrackedFeeSchedule = {
+      managementFee: current.managementFee,
+      performanceFee: current.performanceFee,
+      redemptionPeriodDays: current.redemptionPeriodDays,
+      highWaterMark: current.highWaterMark,
+    };
+    if (!feeScheduleChanged(currentTracked, next)) continue;
+
+    if (current.validFrom === asOf) {
+      await tx
+        .update(feeSchedule)
+        .set(next)
+        .where(and(eq(feeSchedule.entityId, entityId), eq(feeSchedule.validFrom, asOf)));
+      continue;
+    }
+
+    await tx.insert(feeSchedule).values({ entityId, validFrom: asOf, ...next });
+  }
+}
+
+function feeScheduleChanged(current: TrackedFeeSchedule, next: TrackedFeeSchedule): boolean {
+  return (
+    current.managementFee !== next.managementFee ||
+    current.performanceFee !== next.performanceFee ||
+    current.redemptionPeriodDays !== next.redemptionPeriodDays ||
+    current.highWaterMark !== next.highWaterMark
+  );
+}
+
 function money(value: Decimal | undefined, scale: number): string | null {
   if (value === undefined) return null;
   return toNumericString(value, scale);
@@ -533,6 +612,22 @@ export async function writeBackfillBatch(
         depositors: [],
       });
       await applyParents(tx, batch.entities, ids);
+      const asOf = toIsoDate(batch.fetchedAt);
+      await applyMetadata(
+        tx,
+        {
+          source: batch.source,
+          asOf: batch.fetchedAt,
+          fetchedAt: batch.fetchedAt,
+          entities: batch.entities,
+          snapshots: [],
+          depositors: [],
+        },
+        ids,
+        asOf,
+        toIsoDate(addUtcDays(batch.fetchedAt, -1)),
+      );
+      await applyFeeSchedule(tx, batch.entities, ids, asOf);
       return ids;
     });
 

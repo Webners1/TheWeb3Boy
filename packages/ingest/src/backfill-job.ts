@@ -8,6 +8,7 @@ import {
 import {
   ChamberSource,
   DefiLlamaPriceSource,
+  DriftSource,
   EnzymeSource,
   HyperliquidSource,
   OkxSource,
@@ -40,6 +41,7 @@ export async function runBackfill(source: string, date?: string): Promise<void> 
       } else {
         logger.warn('skipping enzyme backfill: ENZYME_API_KEY is not set');
       }
+      await backfillDrift(db, archive, asOf);
     } else if (source === 'enzyme') {
       await backfillEnzyme(db, archive, asOf);
     } else if (source === 'hyperliquid') {
@@ -50,6 +52,8 @@ export async function runBackfill(source: string, date?: string): Promise<void> 
       await backfillOkx(db, archive, asOf);
     } else if (source === 'chamber') {
       await backfillChamber(db, archive, asOf);
+    } else if (source === 'drift') {
+      await backfillDrift(db, archive, asOf);
     } else {
       throw new Error(`unknown source: ${source}`);
     }
@@ -177,6 +181,26 @@ async function backfillEnzyme(db: Db, archive: RawArchive, asOf: Date): Promise<
 
   await writeBackfillBatch(db, {
     source: 'enzyme',
+    fetchedAt: new Date(),
+    entities,
+    snapshots: perEntity(entities, (id) => adapter.backfill(id)),
+  });
+}
+
+/**
+ * Drift's program account is current state only. The "backfill" writes
+ * today's observation so the entity and fee schedule exist; it does not
+ * invent a share-price history we cannot observe.
+ */
+async function backfillDrift(db: Db, archive: RawArchive, asOf: Date): Promise<void> {
+  const adapter = new DriftSource({
+    onRaw: createRawSink(archive, 'drift', asOf),
+  });
+  const entities = await adapter.listEntities();
+  logger.info('drift backfill universe', { count: entities.length });
+
+  await writeBackfillBatch(db, {
+    source: 'drift',
     fetchedAt: new Date(),
     entities,
     snapshots: perEntity(entities, (id) => adapter.backfill(id)),

@@ -51,6 +51,7 @@ describe('HyperliquidSource', () => {
     expect(snapshots.every((row) => row.valuePerUnit === undefined)).toBe(true);
     expect(snapshots.every((row) => row.sampling === 'daily')).toBe(true);
     expect(snapshots.every((row) => row.navQuality === 'raw')).toBe(true);
+    expect(snapshots.every((row) => row.managerStakeRatio !== undefined)).toBe(true);
   });
 
   it('backfill points are downsampled', async () => {

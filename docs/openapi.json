@@ -350,6 +350,41 @@
             "description": "`active`, `closed` or `delisted`. Dead entities are retained deliberately: dropping them is how a leaderboard invents survivorship bias.",
             "example": "active"
           },
+          "provenance": {
+            "type": "string",
+            "description": "`api`, `partner` or `scraped`. A scraped entity is stored but never headline-ranked beside an API-derived one.",
+            "example": "api"
+          },
+          "copyMode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`classic`, `pro`, `tradfi`, `spot`, `futures`, `bot`, or null."
+          },
+          "positionsVisible": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "False when the venue keeps the lead's positions opaque (e.g. Bybit Pro)."
+          },
+          "managerStakeRatio": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Manager capital at risk as a fraction of vault equity. Drift: (totalShares − userShares) / totalShares. Hyperliquid: leaderFraction.",
+            "example": "0.1432"
+          },
+          "pendingRedemptionsUsd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
           "firstSeenAt": {
             "type": "string"
           },
@@ -370,6 +405,11 @@
           "baseCurrency",
           "inceptionDate",
           "status",
+          "provenance",
+          "copyMode",
+          "positionsVisible",
+          "managerStakeRatio",
+          "pendingRedemptionsUsd",
           "firstSeenAt",
           "lastSeenAt"
         ]

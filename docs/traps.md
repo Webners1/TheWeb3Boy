@@ -622,3 +622,30 @@ the streams — and would have vanished the first time anyone backed up
 existing streams were lifted into portable files by
 `tools/recover-ntfs-streams.mjs` and the stored `raw_ref` values were
 rewritten to match. Do not put a colon in an object key, on any OS.
+
+## 27. Drift's Data API is dead, and Velocity is not Drift
+
+`data.api.drift.trade` and `mainnet-beta.api.drift.trade` do not resolve.
+The Tier 2 plan's "generate a client from their OpenAPI spec" path is not
+available. Ground truth is the on-chain vaults program
+`vAuLTsyrvSfZRuRB3XgvkPwNGgYSs9YRYymVebLKoxR` (`drift-labs/drift-vaults`)
+read through Solana JSON-RPC.
+
+Do not pull in `@drift-labs/sdk` or `@drift-labs/vaults-sdk` to get there.
+Those packages drag Metaplex, floats, and a wrapper layer the harness
+forbids. Decode the Vault account from the published IDL and `fetchJson`
+the RPC.
+
+`docs.drift.trade` has served Velocity content. Velocity mirrors Drift's
+structure and its Data API host is marked provisional. Confirm you are
+reading `drift-labs`, not a fork.
+
+The Vault account has share counts, fee terms, and outstanding withdrawals.
+It does **not** have mark-to-market equity. Equity is the Drift user
+account plus oracles. Without that number, `value_per_unit = equity /
+total_shares` cannot be computed. Leave it null. Publishing a guessed NAV
+would be worse than publishing stake ratio and pending redemptions alone.
+
+A scraped or partner CEX row, and any `kind='wallet'`, must never appear
+on a headline board beside an API vault. That is enforced in compute
+(`isHeadlineRankable`) and again in the API query layer, not by convention.

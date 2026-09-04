@@ -1,7 +1,11 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { ChamberSource } from './chamber/adapter.js';
 import { EnzymeSource } from './enzyme/adapter.js';
+import { DriftSource } from './drift/adapter.js';
+import { encodeBase58, encodeVaultAccount } from './drift/account.js';
 import { HyperliquidSource } from './hyperliquid/adapter.js';
 import { OkxSource } from './okx/adapter.js';
 import { loadFixture } from './load-fixture.js';
@@ -146,5 +150,47 @@ describe('raw_ref names resolve to archived payloads', () => {
     const snapshots = await source.backfill(address);
     expectNamesArchived(snapshots, sink.archived);
     expect(snapshots[0]?.rawName).toBe(`vaultDetails/${address}`);
+  });
+
+  it('holds for Drift snapshots, named after the vault account payload', async () => {
+    const pubkey = createHash('sha256').update('raw-name-vault').digest();
+    const address = encodeBase58(pubkey);
+    const account = encodeVaultAccount({
+      name: 'Raw',
+      pubkey,
+      manager: createHash('sha256').update('m').digest(),
+      tokenAccount: createHash('sha256').update('t').digest(),
+      userStats: createHash('sha256').update('s').digest(),
+      user: createHash('sha256').update('u').digest(),
+      delegate: createHash('sha256').update('d').digest(),
+      liquidationDelegate: createHash('sha256').update('l').digest(),
+      userShares: 1n,
+      totalShares: 2n,
+      redeemPeriod: 86400n,
+      totalWithdrawRequested: 0n,
+      managementFee: 0n,
+      initTs: 1_700_000_000n,
+      profitShare: 0,
+      spotMarketIndex: 0,
+      permissioned: false,
+      vaultProtocol: false,
+    });
+    const sink = recorder();
+    const source = new DriftSource({
+      fetchJson: () =>
+        Promise.resolve({
+          jsonrpc: '2.0',
+          result: [
+            {
+              pubkey: address,
+              account: { data: [account.toString('base64'), 'base64'] },
+            },
+          ],
+        }),
+      onRaw: sink.onRaw,
+    });
+    const snapshots = await source.snapshot(new Date('2026-09-04T00:00:00Z'));
+    expectNamesArchived(snapshots, sink.archived);
+    expect(snapshots[0]?.rawName).toBe(`vault/${address}`);
   });
 });

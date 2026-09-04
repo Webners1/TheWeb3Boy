@@ -4,7 +4,9 @@ import type { Decimal } from 'decimal.js';
 // Adapters have ZERO database imports and never write anywhere (AGENTS.md);
 // they fetch, validate with Zod, and return these plain objects.
 
-export type EntityKind = 'vault' | 'lead_trader';
+export type EntityKind = 'vault' | 'lead_trader' | 'wallet';
+export type EntityProvenance = 'api' | 'partner' | 'scraped';
+export type CopyMode = 'classic' | 'pro' | 'tradfi' | 'spot' | 'futures' | 'bot';
 export type VenueType = 'cex' | 'dex';
 export type MarketType = 'spot' | 'perp' | 'mixed';
 export type EntityStatus = 'active' | 'closed' | 'delisted';
@@ -33,10 +35,24 @@ export interface EntityDescriptor {
   inceptionDate?: Date;
   parentExternalId?: string;
   status: EntityStatus;
+  provenance?: EntityProvenance;
+  copyMode?: CopyMode;
+  positionsVisible?: boolean;
   metadata: {
     feeProfitShare?: Decimal;
     feeManagement?: Decimal;
     leaderCommission?: Decimal;
+  };
+  /**
+   * Observed fee terms for `fee_schedule`. Separate from `metadata` so a
+   * venue can record redemption period and high-water-mark without pretending
+   * those belong on the SCD-2 name/status row.
+   */
+  feeSchedule?: {
+    managementFee?: Decimal;
+    performanceFee?: Decimal;
+    redemptionPeriodDays?: number;
+    highWaterMark?: boolean;
   };
 }
 
@@ -48,6 +64,8 @@ export interface RawSnapshot {
   accountValue?: Decimal;
   cumPnl?: Decimal;
   aumUsd?: Decimal;
+  managerStakeRatio?: Decimal;
+  pendingRedemptionsUsd?: Decimal;
   sampling: Sampling;
   navQuality: NavQuality;
   /**

@@ -10,6 +10,7 @@ import {
   findEntity,
   flowSeries,
   latestFollowers,
+  latestSnapshotExtras,
   listEntities,
   metricsForEntity,
   metricsForWindow,
@@ -186,13 +187,17 @@ export function createApp(options: AppOptions): OpenAPIHono {
         limit: query.limit,
         offset: query.offset,
       });
+      const extras = await latestSnapshotExtras(
+        db,
+        rows.map((row) => row.entity.id),
+      );
 
       return c.json(
         {
           windowDays: query.window,
           pagination: { limit: query.limit, offset: query.offset, total },
           entities: rows.map((row) => ({
-            ...presentEntity(row.entity),
+            ...presentEntity(row.entity, extras.get(row.entity.id)),
             metrics: row.metrics === null ? null : presentMetrics(row.metrics),
           })),
         },
@@ -222,7 +227,11 @@ export function createApp(options: AppOptions): OpenAPIHono {
       if (entity === undefined) return c.json({ error: 'not_found' }, 404);
 
       const metrics = await metricsForEntity(db, id);
-      return c.json({ ...presentEntity(entity), metrics: metrics.map(presentMetrics) }, 200);
+      const extras = await latestSnapshotExtras(db, [id]);
+      return c.json(
+        { ...presentEntity(entity, extras.get(id)), metrics: metrics.map(presentMetrics) },
+        200,
+      );
     },
   );
 

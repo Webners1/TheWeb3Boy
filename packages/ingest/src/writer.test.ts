@@ -8,6 +8,7 @@ import {
   entities,
   entityMetadataHistory,
   entitySnapshots,
+  feeSchedule,
   ingestRuns,
 } from '@vaultbench/db';
 import { applyMigrations } from '@vaultbench/db/testing';
@@ -90,6 +91,54 @@ describe('writeSourceBatch', () => {
     expect(await db.select().from(entitySnapshots)).toHaveLength(1);
     const okRuns = (await db.select().from(ingestRuns)).filter((run) => run.status === 'ok');
     expect(okRuns).toHaveLength(2);
+  });
+
+  it('persists manager stake, pending redemptions, and a fee schedule', async () => {
+    const db = await createTestDb();
+    const asOf = new Date('2026-09-04T00:00:00Z');
+    await writeSourceBatch(db as never, {
+      source: 'drift',
+      asOf,
+      fetchedAt: asOf,
+      entities: [
+        entity({
+          source: 'drift',
+          venue: 'drift',
+          provenance: 'api',
+          positionsVisible: true,
+          metadata: { feeManagement: new Decimal('0.02'), feeProfitShare: new Decimal('0.15') },
+          feeSchedule: {
+            managementFee: new Decimal('0.02'),
+            performanceFee: new Decimal('0.15'),
+            redemptionPeriodDays: 14,
+            highWaterMark: true,
+          },
+        }),
+      ],
+      snapshots: [
+        {
+          source: 'drift',
+          externalId: '0xabc',
+          asOf,
+          managerStakeRatio: new Decimal('0.2'),
+          pendingRedemptionsUsd: new Decimal('5'),
+          sampling: 'daily',
+          navQuality: 'raw',
+        },
+      ],
+      depositors: [],
+    });
+
+    const snaps = await db.select().from(entitySnapshots);
+    expect(snaps[0]?.managerStakeRatio).toBe('0.20000000');
+    expect(snaps[0]?.pendingRedemptionsUsd).toBe('5.00000000');
+
+    const fees = await db.select().from(feeSchedule);
+    expect(fees).toHaveLength(1);
+    expect(fees[0]?.managementFee).toBe('0.0200');
+    expect(fees[0]?.performanceFee).toBe('0.1500');
+    expect(fees[0]?.redemptionPeriodDays).toBe(14);
+    expect(fees[0]?.highWaterMark).toBe(true);
   });
 
   it('closes an SCD row when a fee changes', async () => {

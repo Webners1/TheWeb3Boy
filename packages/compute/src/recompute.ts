@@ -9,7 +9,7 @@ import {
 } from '@vaultbench/core';
 import { RunAbortError, evaluateRowBand, logger, toIsoDate } from '@vaultbench/shared';
 
-import { isSourceRankable } from './fees.js';
+import { isHeadlineRankable } from './fees.js';
 import { loadBenchmarks, loadEntities, loadFeeProfile, loadLatestDepositors, loadSnapshots } from './load.js';
 import { replaceFlows, replaceNav, seedMetricDefinitions, upsertMetrics } from './write.js';
 
@@ -91,11 +91,10 @@ export async function recompute(options: RecomputeOptions): Promise<RecomputeRes
       // window, so it is not attached to it.
       const depositors = cross !== undefined && cross.asOf <= endAsOf ? cross.rows : undefined;
 
-      // Headline eligibility is the conjunction of two independent
-      // judgements: is this kind of number rankable at all (core's rule on
-      // nav_quality), and do we trust this venue's field semantics yet
-      // (compute's venue policy). Either one saying no is a no.
-      const rankable = isSourceRankable(entity.source);
+      // Headline eligibility is four independent judgements: is this kind
+      // of number rankable at all (core's rule on nav_quality), do we trust
+      // this venue's field semantics, how we obtained the row, and whether
+      // the instrument belongs in the same ranking. Any one no is a no.
       const metrics: EntityMetrics[] = windows.map((windowDays) => {
         const row = computeEntityMetrics({
           nav: nav.points,
@@ -105,7 +104,15 @@ export async function recompute(options: RecomputeOptions): Promise<RecomputeRes
           ...(depositors === undefined ? {} : { depositors }),
           fees,
         });
-        return { ...row, headlineEligible: row.headlineEligible && rankable };
+        return {
+          ...row,
+          headlineEligible: isHeadlineRankable({
+            source: entity.source,
+            provenance: entity.provenance,
+            kind: entity.kind,
+            navEligible: row.headlineEligible,
+          }),
+        };
       });
 
       const computedAt = new Date();

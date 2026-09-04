@@ -4,6 +4,7 @@ import type { RawArchive } from '@vaultbench/shared';
 import {
   ChamberSource,
   DefiLlamaPriceSource,
+  DriftSource,
   EnzymeSource,
   HyperliquidSource,
   OkxSource,
@@ -16,8 +17,8 @@ import { createRawSink } from './archive.js';
 import { IngestAbortError } from './guards.js';
 import { writeBenchmarkPrices, writeSourceBatch } from './writer.js';
 
-const ENTITY_SOURCES = ['hyperliquid', 'okx', 'chamber', 'enzyme'] as const;
-const ALL_SOURCES = ['hyperliquid', 'okx', 'chamber', 'enzyme', 'defillama'] as const;
+const ENTITY_SOURCES = ['hyperliquid', 'okx', 'chamber', 'enzyme', 'drift'] as const;
+const ALL_SOURCES = ['hyperliquid', 'okx', 'chamber', 'enzyme', 'drift', 'defillama'] as const;
 
 type EntitySourceId = (typeof ENTITY_SOURCES)[number];
 
@@ -42,7 +43,7 @@ export async function ingestSources(options: {
     }
     // Enzyme is the only source behind a key. Under `--source=all` an absent
     // key means "this deployment does not ingest Enzyme", which must not fail
-    // the other four sources' daily run. Asked for by name it still throws,
+    // the other sources' daily run. Asked for by name it still throws,
     // because then the operator has stated an expectation that cannot be met.
     if (id === 'enzyme' && options.source === 'all' && !new EnzymeSource().configured) {
       logger.warn('skipping enzyme: ENZYME_API_KEY is not set', { source: 'enzyme' });
@@ -122,6 +123,9 @@ export function createEntitySource(
   }
   if (id === 'enzyme') {
     return new EnzymeSource({ onRaw });
+  }
+  if (id === 'drift') {
+    return new DriftSource({ onRaw });
   }
   if (id === 'hyperliquid') {
     const maxVaultsRaw = process.env.HYPERLIQUID_MAX_VAULTS;
