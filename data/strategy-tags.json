@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Hand-assigned strategy categories, keyed by \"<source>:<external_id>\".",
+    "",
+    "Hand-tagged on purpose. An auto-classifier at this stage would write its",
+    "own guesses into the permanent record, and there would be no way to tell",
+    "a guess from an observation later. Tag by hand until there is a labelled",
+    "set worth training on (plan phase 5).",
+    "",
+    "Categories:",
+    "  directional - takes net long or short market exposure; expected to",
+    "                track the benchmark's direction.",
+    "  neutral     - market-neutral or delta-hedged; losing to BTC in a bull",
+    "                run is not underperformance and must not be presented as",
+    "                such.",
+    "  yield       - earns a carry, funding or fee stream rather than taking a",
+    "                view on price.",
+    "",
+    "Anything absent from this file stays null, and null is honest. Never",
+    "guess a category to fill the column."
+  ],
+  "tags": {
+    "hyperliquid:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303": "neutral"
+  }
+}

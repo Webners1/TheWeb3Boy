@@ -19,6 +19,7 @@ import {
   type TrackedMetadata,
 } from './guards.js';
 import { rawRef } from './archive.js';
+import { strategyCategoryFor } from './strategy-tags.js';
 
 export interface SourceBatch {
   source: string;
@@ -129,6 +130,9 @@ async function upsertEntities(tx: Tx, batch: SourceBatch): Promise<Map<string, s
       marketType: entity.marketType,
       baseCurrency: entity.baseCurrency,
       inceptionDate: entity.inceptionDate ? toIsoDate(entity.inceptionDate) : null,
+      // Hand-assigned, from data/strategy-tags.json. Null until someone
+      // classifies it, and null is honest.
+      strategyCategory: strategyCategoryFor(entity.source, entity.externalId),
       status: entity.status,
       firstSeenAt: batch.fetchedAt,
       lastSeenAt: batch.fetchedAt,
@@ -146,6 +150,7 @@ async function upsertEntities(tx: Tx, batch: SourceBatch): Promise<Map<string, s
           marketType: values.marketType,
           baseCurrency: values.baseCurrency,
           inceptionDate: values.inceptionDate,
+          strategyCategory: values.strategyCategory,
           status: values.status,
           lastSeenAt: values.lastSeenAt,
         },
@@ -308,7 +313,9 @@ async function applyMetadata(
 
     const next: TrackedMetadata = {
       name: entity.name,
-      strategyCategory: null,
+      // Tracked in the SCD-2 history too, so a re-tagging is dated and
+      // reviewable rather than an untraceable overwrite.
+      strategyCategory: strategyCategoryFor(entity.source, entity.externalId),
       feeProfitShare: money(entity.metadata.feeProfitShare, 4),
       feeManagement: money(entity.metadata.feeManagement, 4),
       leaderCommission: money(entity.metadata.leaderCommission, 4),

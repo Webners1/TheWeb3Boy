@@ -200,7 +200,54 @@ describe('recompute', () => {
     expect(row?.twr).toBe('0.1680000000');
   });
 
-  it('excludes a venue-reported ROI source from headline rankings', async () => {
+  it('keeps a venue-published share price headline eligible', async () => {
+    // Chamber publishes a real per-share NAV. It is already time-weighted,
+    // so it is a better input than our own reconstruction, not a worse one.
+    const db = await createTestDb();
+    const [entity] = await db
+      .insert(entities)
+      .values({
+        source: 'chamber',
+        externalId: 'polygon:0xabc',
+        kind: 'vault',
+        name: 'Chamber Vault',
+        venue: 'chamber:polygon',
+        venueType: 'dex',
+        marketType: 'mixed',
+        baseCurrency: 'USD',
+        status: 'active',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      })
+      .returning({ id: entities.id });
+    if (!entity) throw new Error('seed failed');
+
+    await db.insert(entitySnapshots).values(
+      [
+        ['2026-01-01', '1.000000000000000000'],
+        ['2026-01-04', '1.250000000000000000'],
+      ].map(([asOf, valuePerUnit]) => ({
+        entityId: entity.id,
+        asOf: asOf as string,
+        valuePerUnit: valuePerUnit as string,
+        sampling: 'daily',
+        navQuality: 'reported',
+        fetchedAt: now,
+      })),
+    );
+
+    await recompute({ db, source: 'chamber', windows: [INCEPTION_WINDOW] });
+    const [row] = await db
+      .select()
+      .from(entityMetrics)
+      .where(eq(entityMetrics.entityId, entity.id));
+
+    expect(row?.navQuality).toBe('reported');
+    expect(row?.headlineEligible).toBe(true);
+    expect(row?.twr).toBe('0.2500000000');
+  });
+
+  it('holds an unverified venue out of headline rankings without dropping it', async () => {
     const db = await createTestDb();
 
     const [entity] = await db
@@ -243,10 +290,10 @@ describe('recompute', () => {
     await recompute({ db, source: 'okx', windows: [INCEPTION_WINDOW] });
     const [row] = await db.select().from(entityMetrics).where(eq(entityMetrics.entityId, entity.id));
 
-    expect(row?.navQuality).toBe('reported');
-    expect(row?.headlineEligible).toBe(false);
-    // Reported figures are already net; the fee haircut must not be reapplied.
+    // The metrics still exist and are still queryable — OKX is simply not
+    // ranked until its PnL field semantics are verified.
     expect(row?.twr).toBe('0.5000000000');
+    expect(row?.headlineEligible).toBe(false);
   });
 
   it('computes the lead-versus-follower gap from the depositor cross-section', async () => {

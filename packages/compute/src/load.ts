@@ -60,6 +60,7 @@ export async function loadSnapshots(db: Db, entityId: string): Promise<SnapshotP
       accountValue: entitySnapshots.accountValue,
       cumPnl: entitySnapshots.cumPnl,
       sampling: entitySnapshots.sampling,
+      navQuality: entitySnapshots.navQuality,
     })
     .from(entitySnapshots)
     .where(eq(entitySnapshots.entityId, entityId))
@@ -71,6 +72,9 @@ export async function loadSnapshots(db: Db, entityId: string): Promise<SnapshotP
     accountValue: optionalDecimal(row.accountValue),
     cumPnl: optionalDecimal(row.cumPnl),
     sampling: row.sampling === 'daily' ? 'daily' : 'downsampled',
+    // Carried through so a venue that publishes only money-weighted ROI
+    // stays labelled `roi` and out of the headline rankings.
+    ...(row.navQuality === 'roi' ? { navQuality: 'roi' as const } : {}),
   }));
 }
 

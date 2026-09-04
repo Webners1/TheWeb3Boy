@@ -96,6 +96,15 @@ describe('deriveNavSeries', () => {
     expect(twr(points)?.toFixed()).toBe('0.1');
   });
 
+  it('carries an ROI label through instead of promoting it to a NAV', () => {
+    const roi: SnapshotPoint[] = [
+      { asOf: '2026-01-01', valuePerUnit: new Decimal('1'), sampling: 'daily', navQuality: 'roi' },
+      { asOf: '2026-01-02', valuePerUnit: new Decimal('1.2'), sampling: 'daily', navQuality: 'roi' },
+    ];
+    const { points } = deriveNavSeries(roi);
+    expect(points.every((navPoint) => navPoint.navQuality === 'roi')).toBe(true);
+  });
+
   it('does not treat account value deltas as performance', () => {
     // Pure deposit, zero trading: the naive answer is +900%, the right one is 0.
     const depositOnly = [point('2026-01-01', '1000', '0'), point('2026-01-02', '10000', '0')];

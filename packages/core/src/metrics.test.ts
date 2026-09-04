@@ -173,7 +173,22 @@ describe('computeEntityMetrics', () => {
     expect(metrics.headlineEligible).toBe(true);
   });
 
-  it('excludes venue-reported ROI from headline eligibility', () => {
+  it('excludes money-weighted ROI from headline eligibility', () => {
+    const roi = points.map((point) => ({ ...point, navQuality: 'roi' as const }));
+    const metrics = computeEntityMetrics({
+      nav: roi,
+      endAsOf: '2026-01-31',
+      windowDays: 31,
+      benchmarks: {},
+      fees: { basis: 'net' },
+    });
+    expect(metrics.navQuality).toBe('roi');
+    expect(metrics.headlineEligible).toBe(false);
+  });
+
+  it('keeps a venue-published per-unit NAV headline eligible', () => {
+    // A real share price is already time-weighted — a better input than our
+    // own reconstruction, so excluding it would be the opposite error.
     const reported = points.map((point) => ({ ...point, navQuality: 'reported' as const }));
     const metrics = computeEntityMetrics({
       nav: reported,
@@ -182,7 +197,7 @@ describe('computeEntityMetrics', () => {
       benchmarks: {},
       fees: { basis: 'net' },
     });
-    expect(metrics.headlineEligible).toBe(false);
+    expect(metrics.headlineEligible).toBe(true);
   });
 
   it('returns coverage without metrics when the window is empty', () => {

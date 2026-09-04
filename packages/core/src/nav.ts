@@ -124,7 +124,9 @@ function reportedSeries(points: readonly SnapshotPoint[]): NavSeries | undefined
     out.push({
       asOf: point.asOf,
       valuePerUnit: value,
-      navQuality: 'reported',
+      // A published share price stays `reported`; a published ROI stays
+      // `roi` and is carried all the way through to headline eligibility.
+      navQuality: point.navQuality ?? 'reported',
       method: 'reported',
       sampling: point.sampling,
     });

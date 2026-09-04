@@ -41,6 +41,7 @@ Read `docs/traps.md` before touching any adapter, job, or analytical query.
 | `packages/compute` | Recomputes derived tables from raw snapshots. Writes derived data only. |
 | `packages/shared` | Zod primitives, decimal helpers, logger, storage client, run guards. |
 | `docs/traps.md` | Known data traps. Update it whenever a new one is discovered. |
+| `data/strategy-tags.json` | Hand-assigned strategy categories. A tag is a reviewable diff, never a row typed into production. |
 
 ## Proof — which rule is enforced by what
 
@@ -69,7 +70,11 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Derived tables are rebuildable | `packages/db/src/schema.test.ts` (`derived tables are rebuildable`) | automated |
 | Every published metric has semantics in the DB | `packages/compute/src/recompute.test.ts` (`defines every published entity_metrics column`) | automated |
 | Coverage travels with every figure | `entity_metrics.days_covered`/`is_full_window`/`sampling` are `NOT NULL`, asserted in `schema.test.ts` | automated |
-| Reported ROI is excluded from headline rankings | `packages/core/src/fees.ts` `isHeadlineEligible` + `recompute.test.ts` | automated |
+| Money-weighted ROI is excluded from headline rankings | `packages/core/src/fees.ts` `isHeadlineEligible` + `recompute.test.ts` | automated |
+| An unverified venue is not ranked | `isSourceRankable` in `packages/compute/src/fees.ts` + `recompute.test.ts` | automated |
+| Strategy categories are hand-assigned, never guessed | `packages/ingest/src/strategy-tags.test.ts` | automated |
+| Chamber chain codes are checked against the response | `packages/sources/src/chamber/adapter.test.ts` | automated |
+| Chamber fee numerators are basis points | `chamberFundSchema` refine + `chamber/adapter.test.ts` | automated |
 | A recompute that produces nothing aborts | `evaluateRowBand` in `packages/shared` + `recompute.test.ts` | automated |
 
 The `judgement` and `pending` rows are the honest gaps. When a rule moves from

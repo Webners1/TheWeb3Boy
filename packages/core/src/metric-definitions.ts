@@ -32,9 +32,9 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     unit: 'fraction',
     direction: 'higher_is_better',
     caveats:
-      "Comparable across entities only when nav_quality='derived'. Rows with " +
-      "nav_quality='reported' are venue-published money-weighted ROI and are excluded " +
-      'from headline rankings. ' +
+      "Comparable across entities when nav_quality is 'reported' or 'derived'. Rows with " +
+      "nav_quality='roi' are venue-published money-weighted returns, are not time-weighted, " +
+      'and are excluded from headline rankings. ' +
       DOWNSAMPLED_CAVEAT,
   },
   {
@@ -185,12 +185,14 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     key: 'nav_quality',
     label: 'NAV quality',
     description:
-      "'derived' when the per-unit series was reconstructed from account value net of " +
-      "flows; 'reported' when the venue published a per-unit NAV or only an ROI figure.",
+      "'reported' when the venue published a true per-unit NAV or share price; 'derived' " +
+      'when the per-unit series was reconstructed from account value net of flows; ' +
+      "'roi' when the venue published only a money-weighted return.",
     unit: 'enum',
     direction: 'neutral',
     caveats:
-      "Only 'derived' rows are eligible for headline rankings. Mixing reported ROI with " +
-      'derived TWR is the error this column exists to prevent.',
+      "'roi' rows are excluded from headline rankings. Mixing money-weighted ROI with " +
+      'time-weighted return is the error this column exists to prevent. A venue-published ' +
+      'share price is more trustworthy than our reconstruction, not less.',
   },
 ];

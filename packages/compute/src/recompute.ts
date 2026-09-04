@@ -9,6 +9,7 @@ import {
 } from '@vaultbench/core';
 import { RunAbortError, evaluateRowBand, logger, toIsoDate } from '@vaultbench/shared';
 
+import { isSourceRankable } from './fees.js';
 import { loadBenchmarks, loadEntities, loadFeeProfile, loadLatestDepositors, loadSnapshots } from './load.js';
 import { replaceFlows, replaceNav, seedMetricDefinitions, upsertMetrics } from './write.js';
 
@@ -90,16 +91,22 @@ export async function recompute(options: RecomputeOptions): Promise<RecomputeRes
       // window, so it is not attached to it.
       const depositors = cross !== undefined && cross.asOf <= endAsOf ? cross.rows : undefined;
 
-      const metrics: EntityMetrics[] = windows.map((windowDays) =>
-        computeEntityMetrics({
+      // Headline eligibility is the conjunction of two independent
+      // judgements: is this kind of number rankable at all (core's rule on
+      // nav_quality), and do we trust this venue's field semantics yet
+      // (compute's venue policy). Either one saying no is a no.
+      const rankable = isSourceRankable(entity.source);
+      const metrics: EntityMetrics[] = windows.map((windowDays) => {
+        const row = computeEntityMetrics({
           nav: nav.points,
           endAsOf,
           windowDays,
           benchmarks,
           ...(depositors === undefined ? {} : { depositors }),
           fees,
-        }),
-      );
+        });
+        return { ...row, headlineEligible: row.headlineEligible && rankable };
+      });
 
       const computedAt = new Date();
       await db.transaction(async (tx) => {

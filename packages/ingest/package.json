@@ -18,7 +18,8 @@
     "@vaultbench/db": "workspace:*",
     "@vaultbench/shared": "workspace:*",
     "@vaultbench/sources": "workspace:*",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.7",

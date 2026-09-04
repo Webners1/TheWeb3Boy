@@ -2,6 +2,7 @@ import { ingestRuns, type Db } from '@vaultbench/db';
 import { logger, parseIsoDate, toIsoDate, utcToday } from '@vaultbench/shared';
 import type { RawArchive } from '@vaultbench/shared';
 import {
+  ChamberSource,
   DefiLlamaPriceSource,
   HyperliquidSource,
   OkxSource,
@@ -14,8 +15,14 @@ import { createRawSink } from './archive.js';
 import { IngestAbortError } from './guards.js';
 import { writeBenchmarkPrices, writeSourceBatch } from './writer.js';
 
-const ENTITY_SOURCES = ['hyperliquid', 'okx'] as const;
-const ALL_SOURCES = ['hyperliquid', 'okx', 'defillama'] as const;
+const ENTITY_SOURCES = ['hyperliquid', 'okx', 'chamber'] as const;
+const ALL_SOURCES = ['hyperliquid', 'okx', 'chamber', 'defillama'] as const;
+
+type EntitySourceId = (typeof ENTITY_SOURCES)[number];
+
+function isEntitySource(value: string): value is EntitySourceId {
+  return (ENTITY_SOURCES as readonly string[]).includes(value);
+}
 
 export async function ingestSources(options: {
   db: Db;
@@ -32,7 +39,7 @@ export async function ingestSources(options: {
       await ingestDefillama(options.db, options.archive, asOf);
       continue;
     }
-    if (id === 'hyperliquid' || id === 'okx') {
+    if (isEntitySource(id)) {
       await ingestEntitySource(options.db, options.archive, id, asOf);
       continue;
     }
@@ -43,7 +50,7 @@ export async function ingestSources(options: {
 async function ingestEntitySource(
   db: Db,
   archive: RawArchive,
-  id: (typeof ENTITY_SOURCES)[number],
+  id: EntitySourceId,
   asOf: Date,
 ): Promise<void> {
   const fetchedAt = new Date();
@@ -98,9 +105,12 @@ async function ingestDefillama(db: Db, archive: RawArchive, asOf: Date): Promise
 }
 
 export function createEntitySource(
-  id: 'hyperliquid' | 'okx',
+  id: EntitySourceId,
   onRaw?: (name: string, payload: unknown) => Promise<void>,
 ): Source {
+  if (id === 'chamber') {
+    return new ChamberSource({ onRaw });
+  }
   if (id === 'hyperliquid') {
     const maxVaultsRaw = process.env.HYPERLIQUID_MAX_VAULTS;
     const maxVaults = maxVaultsRaw ? Number.parseInt(maxVaultsRaw, 10) : undefined;

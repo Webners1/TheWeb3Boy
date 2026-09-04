@@ -9,7 +9,17 @@ export type VenueType = 'cex' | 'dex';
 export type MarketType = 'spot' | 'perp' | 'mixed';
 export type EntityStatus = 'active' | 'closed' | 'delisted';
 export type Sampling = 'daily' | 'downsampled';
-export type NavQuality = 'reported' | 'derived' | 'raw';
+/**
+ * What a raw snapshot row holds, from the adapter's point of view:
+ *
+ * `raw`      — account value and/or cumulative PnL, no per-unit value. The
+ *              per-unit series is derived later by `packages/compute`.
+ * `reported` — the venue published a true per-unit NAV or share price.
+ * `roi`      — the venue published only a money-weighted return. Kept
+ *              separate from `reported` so it can be excluded from headline
+ *              rankings; see NavQuality in @vaultbench/core.
+ */
+export type NavQuality = 'raw' | 'reported' | 'roi';
 
 export interface EntityDescriptor {
   source: string;

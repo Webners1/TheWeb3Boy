@@ -56,10 +56,14 @@ export function netOfFees(
 }
 
 /**
- * Reported money-weighted ROI and derived time-weighted return are different
- * quantities. Ranking them against each other is the lie every existing
- * leaderboard tells, so headline eligibility is decided here, once.
+ * Money-weighted ROI and time-weighted return are different quantities.
+ * Ranking them against each other is the lie every existing leaderboard
+ * tells, so headline eligibility is decided here, once.
+ *
+ * A venue-published share price is *more* trustworthy than our own
+ * reconstruction, not less — what gets excluded is ROI, not everything we
+ * did not compute ourselves.
  */
 export function isHeadlineEligible(navQuality: NavQuality): boolean {
-  return navQuality === 'derived';
+  return navQuality !== 'roi';
 }

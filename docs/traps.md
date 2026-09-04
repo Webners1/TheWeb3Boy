@@ -107,7 +107,71 @@ direction to be wrong in — but it is unverified. Confirm against a vault where
 the leader's realised commission can be observed independently, then update
 `FEE_BASIS` and delete this entry.
 
-## 12. Annualising an irregular series
+## 12. Chamber's `adjustedTokenPrice` is not a price
+
+On `tokenPriceHistory`, the field named `adjustedTokenPrice` is **cumulative
+return since inception**, as a fraction. Per-unit value is `1 + value`.
+
+How this was caught: real responses contain negative values (observed down to
+`-0.55`), and a share price cannot be negative. Confirmed on two vaults —
+`1 + lastValue` reconciles with `Fund.tokenPrice` in both cases.
+
+- The first point of an `all` series is exactly `"0"`, meaning an index of 1,
+  not a worthless vault.
+- `tokenPrice` is `null` on every history point. Only the `Fund` list carries
+  a real `tokenPrice`, and there it is **wei-scale with 18 decimals** while
+  the history value is already decimal-scaled. Two scalings for one concept
+  in one API.
+- A value of `-1` or lower would mean total loss and is skipped: there is no
+  positive index to continue from.
+
+## 13. Chamber chain codes fall back silently
+
+`allFundsByBlockchainCode` takes an untyped, case-insensitive string. An
+unrecognised code may return a default chain's data rather than erroring, so
+every row is checked against the code that was requested before it is
+accepted. Without that check one typo duplicates a whole chain's universe
+under the wrong key.
+
+Chamber addresses are also **not unique across chains**, so the external id is
+`chain:address`, never the bare address.
+
+## 14. A TVL floor at discovery invents deaths
+
+Polygon alone returns ~1,579 Chamber vaults, most of them dust, and the
+temptation is to filter by TVL at ingestion. Do not. A vault that shrinks
+below the floor would vanish from the universe and be marked `delisted` —
+a death that never happened, in the one table whose whole purpose is an
+honest survivorship record. Filter for presentation, never for ingestion.
+
+The daily Chamber snapshot costs one request per chain regardless, because
+the fund list already carries `tokenPrice`, so there is no cost argument for
+a floor either.
+
+## 15. Open: Enzyme is unbuilt because the shape is unverifiable
+
+The Enzyme adapter is deliberately **not** written. What is known:
+
+- Endpoint `POST https://api.enzyme.finance/enzyme.enzyme.v1.EnzymeService/<Method>`,
+  headers `authorization: Bearer <key>` and `connect-protocol-version: 1`.
+  This is Connect-over-HTTP, so standard `fetch` is enough — no gRPC client
+  and no new dependency.
+- Relevant methods: `GetVaultList`, `GetVault`, `GetVaultTimeSeries`,
+  `GetVaultDepositors`, `GetVaultConfiguration`.
+- Keys are free and self-serve at
+  https://app.enzyme.finance/account/api-tokens.
+
+What is not known: the response field names. They live only in the Buf schema
+registry behind a key. An adapter written against guessed field names would
+pass its own tests, fail its Zod parse in production, and cost a day to
+diagnose. Get a key, capture fixtures the way
+`tools/capture-chamber-fixtures.mjs` does, then write it.
+
+The Chamber work is the argument for this rule: every field name there was
+plausible and one of them (`adjustedTokenPrice`) meant something entirely
+different from what it said. Trap 12.
+
+## 16. Annualising an irregular series
 
 Volatility is annualised by the *observed* mean step length, not an assumed
 daily cadence. Scaling a ~biweekly Hyperliquid backfill as if it were daily

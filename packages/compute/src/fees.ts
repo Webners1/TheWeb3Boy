@@ -23,8 +23,33 @@ const FEE_BASIS: Record<string, FeeBasis> = {
   hyperliquid: 'gross',
   okx: 'net',
   enzyme: 'net',
+  // dHEDGE takes its performance fee by minting manager shares, which
+  // dilutes the token price. The published price is therefore already net.
   chamber: 'net',
 };
+
+/**
+ * Whether a venue's inputs are verified well enough to rank its entities
+ * against others.
+ *
+ * This is deliberately separate from `nav_quality`. Quality describes what
+ * kind of number we have; this describes how much we trust the venue's
+ * semantics. OKX is excluded because `public-lead-traders.pnl` is a *ranked
+ * period* figure, not cumulative since inception — differencing it as if it
+ * were cumulative would silently produce nonsense. The rows are still
+ * ingested and still get metrics; they just do not appear in headline
+ * rankings until someone verifies the field. See docs/traps.md.
+ */
+const RANKABLE: Record<string, boolean> = {
+  hyperliquid: true,
+  chamber: true,
+  enzyme: true,
+  okx: false,
+};
+
+export function isSourceRankable(source: string): boolean {
+  return RANKABLE[source] ?? false;
+}
 
 export interface RecordedFees {
   feeProfitShare: string | null;

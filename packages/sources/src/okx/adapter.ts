@@ -78,7 +78,7 @@ export class OkxSource implements Source {
       cumPnl: parseDecimal(rank.pnl),
       aumUsd: parseDecimal(rank.aum),
       sampling: 'daily' as const,
-      navQuality: 'reported' as const,
+      navQuality: 'raw' as const,
     }));
   }
 
@@ -98,7 +98,7 @@ export class OkxSource implements Source {
       asOf: dateFromEpochMillis(row.beginTs),
       cumPnl: parseDecimal(row.pnl),
       sampling: 'daily' as const,
-      navQuality: 'reported' as const,
+      navQuality: 'raw' as const,
     }));
   }
 

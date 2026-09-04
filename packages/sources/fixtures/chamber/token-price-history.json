@@ -1,0 +1,92 @@
+{
+  "data": {
+    "tokenPriceHistory": {
+      "history": [
+        {
+          "timestamp": "1708970453000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1709143253000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.000124313149356885",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1709316053000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "-0.006962540527678172",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1709488853000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.004319486737525814",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1709661653000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.01881135190473406",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1709834453000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.08220764463493743",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710007253000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.079555642362380802",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710180053000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.144190780338597843",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710352853000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.158769355921137624",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710525653000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.01800517809998515",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710698453000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "0.002389011555287013",
+          "performance": null,
+          "adjustedPerformance": null
+        },
+        {
+          "timestamp": "1710871253000",
+          "tokenPrice": null,
+          "adjustedTokenPrice": "-0.114617616763177759",
+          "performance": null,
+          "adjustedPerformance": null
+        }
+      ]
+    }
+  }
+}

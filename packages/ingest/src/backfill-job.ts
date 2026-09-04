@@ -6,6 +6,7 @@ import {
   type RawArchive,
 } from '@vaultbench/shared';
 import {
+  ChamberSource,
   DefiLlamaPriceSource,
   HyperliquidSource,
   OkxSource,
@@ -30,12 +31,15 @@ export async function runBackfill(source: string, date?: string): Promise<void> 
       await backfillHyperliquid(db, archive, asOf);
       await backfillDefillama(db, archive, asOf);
       await backfillOkx(db, archive, asOf);
+      await backfillChamber(db, archive, asOf);
     } else if (source === 'hyperliquid') {
       await backfillHyperliquid(db, archive, asOf);
     } else if (source === 'defillama') {
       await backfillDefillama(db, archive, asOf);
     } else if (source === 'okx') {
       await backfillOkx(db, archive, asOf);
+    } else if (source === 'chamber') {
+      await backfillChamber(db, archive, asOf);
     } else {
       throw new Error(`unknown source: ${source}`);
     }
@@ -112,6 +116,31 @@ async function backfillOkx(db: Db, archive: RawArchive, asOf: Date): Promise<voi
 
   await writeBackfillBatch(db, {
     source: 'okx',
+    fetchedAt: new Date(),
+    entities,
+    snapshots,
+  });
+}
+
+/**
+ * Chamber history is one request per vault, and the universe runs to
+ * thousands across chains. It is a one-shot job, so it plods rather than
+ * parallelises — the token bucket in the adapter keeps it polite.
+ */
+async function backfillChamber(db: Db, archive: RawArchive, asOf: Date): Promise<void> {
+  const adapter = new ChamberSource({
+    onRaw: createRawSink(archive, 'chamber', asOf),
+  });
+  const entities = await adapter.listEntities();
+  logger.info('chamber backfill universe', { count: entities.length });
+
+  const snapshots: RawSnapshot[] = [];
+  for (const entity of entities) {
+    snapshots.push(...(await adapter.backfill(entity.externalId)));
+  }
+
+  await writeBackfillBatch(db, {
+    source: 'chamber',
     fetchedAt: new Date(),
     entities,
     snapshots,
