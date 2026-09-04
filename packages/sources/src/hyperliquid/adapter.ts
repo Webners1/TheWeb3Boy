@@ -94,6 +94,9 @@ export class HyperliquidSource implements Source {
         aumUsd: parseDecimal(entry.summary.tvl),
         sampling: 'daily',
         navQuality: 'raw',
+        // The day point comes from the per-vault detail call, not the
+        // summaries list.
+        rawName: `vaultDetails/${entry.summary.vaultAddress}`,
       });
     }
 
@@ -119,6 +122,7 @@ export class HyperliquidSource implements Source {
         cumPnl: cumPnl === undefined ? undefined : parseDecimal(cumPnl),
         sampling: 'downsampled',
         navQuality: 'raw',
+        rawName: `vaultDetails/${address}`,
       });
     }
 

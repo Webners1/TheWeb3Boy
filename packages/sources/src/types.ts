@@ -50,6 +50,20 @@ export interface RawSnapshot {
   aumUsd?: Decimal;
   sampling: Sampling;
   navQuality: NavQuality;
+  /**
+   * The archive name this row was parsed from — the same string the adapter
+   * passed to `onRaw`, without the `raw/<source>/<day>/` prefix or the
+   * `.json.gz` suffix. The writer turns it into `entity_snapshots.raw_ref`.
+   *
+   * Reported by the adapter because only the adapter knows it. The writer
+   * used to guess (`vaultDetails/<id>` for Hyperliquid, the bare external id
+   * for everyone else) and guessed wrong for every backfilled row: 60,558
+   * Chamber snapshots carried a `raw_ref` pointing at a path that had never
+   * existed. A dangling pointer is worse than a null one, because null says
+   * "no payload recorded" while a wrong path says "here it is" and sends the
+   * reader looking. Leave it unset rather than invent one.
+   */
+  rawName?: string;
 }
 
 export interface DepositorRecord {

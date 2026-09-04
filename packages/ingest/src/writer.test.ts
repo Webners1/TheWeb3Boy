@@ -12,6 +12,8 @@ import {
 } from '@vaultbench/db';
 import { applyMigrations } from '@vaultbench/db/testing';
 
+import type { RawSnapshot } from '@vaultbench/sources';
+
 import { IngestAbortError } from './guards.js';
 import { writeBackfillBatch, writeSourceBatch } from './writer.js';
 import type { SourceBatch } from './writer.js';
@@ -190,7 +192,7 @@ describe('writeBackfillBatch', () => {
       source: 'hyperliquid',
       fetchedAt: new Date(),
       entities: [descriptor],
-      snapshots: [
+      snapshots: chunks([
         {
           source: 'hyperliquid',
           externalId: '0xabc',
@@ -199,7 +201,7 @@ describe('writeBackfillBatch', () => {
           sampling: 'downsampled',
           navQuality: 'raw',
         },
-      ],
+      ]),
     });
 
     const rows = await db.select().from(entitySnapshots);
@@ -208,4 +210,167 @@ describe('writeBackfillBatch', () => {
     expect(rows[0]?.accountValue).toBe('10.00000000');
     expect(await db.select().from(benchmarkPrices)).toHaveLength(0);
   });
+
+  it('points raw_ref at the run that archived the payload, not the snapshot date', async () => {
+    /**
+     * The bug this exists for. A backfill fetched today writes snapshots dated
+     * years ago, and the archive lives under *today*. Deriving raw_ref from
+     * the snapshot's own as_of produced
+     * `raw/chamber/2023-12-21/<external_id>.json.gz` for all 60,558 Chamber
+     * rows — a path that had never been written, on a column whose only job is
+     * to let a reader find the payload a number came from.
+     */
+    const db = await createTestDb();
+    const fetchedAt = new Date('2026-09-04T00:00:00Z');
+
+    await writeBackfillBatch(db as never, {
+      source: 'chamber',
+      fetchedAt,
+      entities: [entity()],
+      snapshots: chunks([
+        {
+          source: 'chamber',
+          externalId: '0xabc',
+          asOf: new Date('2023-12-21T00:00:00Z'),
+          valuePerUnit: new Decimal('1.5'),
+          sampling: 'downsampled',
+          navQuality: 'reported',
+          rawName: 'tokenPriceHistory/base:0xabc',
+        },
+      ]),
+    });
+
+    const rows = await db.select().from(entitySnapshots);
+    expect(rows[0]?.asOf).toBe('2023-12-21');
+    // Run date in the path, and the adapter's own archive name.
+    expect(rows[0]?.rawRef).toBe(
+      'raw/chamber/2026-09-04/tokenPriceHistory/base:0xabc.json.gz',
+    );
+  });
+
+  it('leaves raw_ref null rather than inventing a path', async () => {
+    // A pointer that resolves to nothing is worse than an absent one: null
+    // says "no payload recorded", a wrong path says "here it is".
+    const db = await createTestDb();
+
+    await writeBackfillBatch(db as never, {
+      source: 'chamber',
+      fetchedAt: new Date('2026-09-04T00:00:00Z'),
+      entities: [entity()],
+      snapshots: chunks([
+        {
+          source: 'chamber',
+          externalId: '0xabc',
+          asOf: new Date('2023-12-21T00:00:00Z'),
+          valuePerUnit: new Decimal('1.5'),
+          sampling: 'downsampled',
+          navQuality: 'reported',
+        },
+      ]),
+    });
+
+    const rows = await db.select().from(entitySnapshots);
+    expect(rows[0]?.rawRef).toBeNull();
+  });
+
+  it('consumes history lazily, one entity at a time', async () => {
+    /**
+     * The memory fix. The writer must pull chunks as it goes rather than
+     * receive the universe up front — for Enzyme that array would have been
+     * past a million snapshot objects and the job would have died of heap
+     * exhaustion after twenty minutes of rate-limited fetching, with nothing
+     * written.
+     *
+     * Asserted by observing that rows are already committed by the time the
+     * generator is asked for its second entity.
+     */
+    const db = await createTestDb();
+    const first = entity({ externalId: '0xaaa' });
+    const second = entity({ externalId: '0xbbb' });
+    const committedBeforeSecond: number[] = [];
+
+    async function* lazy() {
+      yield [snapshot('0xaaa', '2024-01-01')];
+      committedBeforeSecond.push((await db.select().from(entitySnapshots)).length);
+      yield [snapshot('0xbbb', '2024-01-01')];
+    }
+
+    const result = await writeBackfillBatch(db as never, {
+      source: 'chamber',
+      fetchedAt: new Date('2026-09-04T00:00:00Z'),
+      entities: [first, second],
+      snapshots: lazy(),
+    });
+
+    // The first entity's row was durable before the second was fetched.
+    expect(committedBeforeSecond).toEqual([1]);
+    expect(result.rowsWritten).toBe(2);
+    expect(await db.select().from(entitySnapshots)).toHaveLength(2);
+  });
+
+  it('keeps the entities it reached when a later fetch fails', async () => {
+    // A single universe-wide transaction threw away hours of polite,
+    // rate-limited work on one bad response. Per-entity transactions mean a
+    // re-run resumes instead of restarting; snapshots are keyed
+    // (entity_id, as_of) so re-running is safe.
+    const db = await createTestDb();
+
+    async function* failsHalfway() {
+      yield [snapshot('0xaaa', '2024-01-01')];
+      throw new Error('venue returned 500');
+    }
+
+    await expect(
+      writeBackfillBatch(db as never, {
+        source: 'chamber',
+        fetchedAt: new Date('2026-09-04T00:00:00Z'),
+        entities: [entity({ externalId: '0xaaa' }), entity({ externalId: '0xbbb' })],
+        snapshots: failsHalfway(),
+      }),
+    ).rejects.toThrow(/venue returned 500/);
+
+    expect(await db.select().from(entitySnapshots)).toHaveLength(1);
+    const runs = await db.select().from(ingestRuns);
+    expect(runs.at(-1)?.status).toBe('failed');
+  });
+
+  it('writes more rows than fit in one insert statement', async () => {
+    // Inserts are chunked at 500 to stay under Postgres's bound-parameter
+    // cap; the boundary is where an off-by-one would hide.
+    const db = await createTestDb();
+    const history = Array.from({ length: 1201 }, (_, index) =>
+      snapshot('0xabc', isoDay(index)),
+    );
+
+    const result = await writeBackfillBatch(db as never, {
+      source: 'chamber',
+      fetchedAt: new Date('2026-09-04T00:00:00Z'),
+      entities: [entity()],
+      snapshots: chunks(history),
+    });
+
+    expect(result.rowsWritten).toBe(1201);
+    expect(await db.select().from(entitySnapshots)).toHaveLength(1201);
+  });
 });
+
+/** Wraps a finished array as the single chunk the writer expects. */
+async function* chunks(snapshots: RawSnapshot[]): AsyncGenerator<RawSnapshot[]> {
+  yield snapshots;
+}
+
+function snapshot(externalId: string, asOf: string): RawSnapshot {
+  return {
+    source: 'chamber',
+    externalId,
+    asOf: new Date(`${asOf}T00:00:00Z`),
+    valuePerUnit: new Decimal('1.25'),
+    sampling: 'downsampled',
+    navQuality: 'reported',
+  };
+}
+
+function isoDay(offset: number): string {
+  const base = Date.UTC(2020, 0, 1) + offset * 86_400_000;
+  return new Date(base).toISOString().slice(0, 10);
+}

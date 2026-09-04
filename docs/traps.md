@@ -528,6 +528,7 @@ If it happens again, the repair is to map each character of a non-ASCII run
 back to its cp1252 byte and decode the result as UTF-8, accepting only runs
 that decode without a replacement character. Bytes `0x80`-`0x9F` need a
 reverse cp1252 table; everything else maps to itself.
+
 ## 24. A relative ARCHIVE_ROOT splits the archive per package
 
 `.env.example` documents `ARCHIVE_ROOT=./var/archive`, and for weeks that
@@ -566,3 +567,37 @@ append-only, including when the bug was ours.
 The general shape of this, worth watching for elsewhere: **a relative path in
 configuration is only meaningful next to a stated base.** In a monorepo the
 working directory is not that base, because it changes per script.
+
+## 25. A guessed `raw_ref` is worse than no `raw_ref`
+
+`entity_snapshots.raw_ref` exists so a reader can find the payload a number
+came from. The writer used to assemble it: Hyperliquid got
+`vaultDetails/<id>`, everyone else got the bare external id, and the date in
+the path was the snapshot's own `as_of`.
+
+That is two independent guesses, and both were wrong for a backfill.
+
+A Chamber history point from 2023-12-21, fetched on 2026-09-04, was archived
+as `raw/chamber/2026-09-04/tokenPriceHistory/base:0x….json.gz`. The stored
+`raw_ref` said `raw/chamber/2023-12-21/base:0x….json.gz`. All 60,558
+backfilled Chamber rows pointed at a path that had never been written. OKX
+was worse: ranks are paginated and the page number is part of the archive
+key, so `lead-traders/<external_id>` was never a real path for any row.
+
+A dangling pointer is worse than a null. Null says "no payload recorded". A
+wrong path says "here it is" and sends the reader looking. The column's only
+job is to resolve; a value that does not is a lie.
+
+The adapter now reports the archive name, because only the adapter knows it.
+The writer turns that name plus the *run* date into `raw_ref`, or writes
+null if the adapter left the name unset. `packages/sources/src/raw-name.test.ts`
+captures every `onRaw` call and asserts every snapshot's `rawName` is one of
+them — Chamber, Enzyme, OKX (page number included), Hyperliquid.
+
+The same pass stopped accumulating the universe in memory before writing.
+Chamber at 60k rows survived that. Enzyme's 1,738 Ethereum vaults carry
+daily history back to 2019, which is past a million `RawSnapshot` objects,
+each holding `Decimal`s. The job would have died of heap exhaustion after
+twenty minutes of polite fetching, with nothing written. History is now an
+async iterable, one entity at a time, each committed in its own transaction
+so an interrupted run leaves what it reached.

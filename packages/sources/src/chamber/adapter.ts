@@ -124,6 +124,8 @@ export class ChamberSource implements Source {
         aumUsd: parseDecimal(fund.totalValue).div(WEI),
         sampling: 'daily',
         navQuality: 'reported',
+        // Same key loadFunds archived this fund under.
+        rawName: `allFunds/${fund.blockchainCode.toLowerCase()}`,
       });
     }
 
@@ -175,6 +177,7 @@ export class ChamberSource implements Source {
         valuePerUnit,
         sampling: 'downsampled',
         navQuality: 'reported',
+        rawName: `tokenPriceHistory/${externalIdValue}`,
       });
     }
 

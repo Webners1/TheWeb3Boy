@@ -58,6 +58,22 @@ export async function runBackfill(source: string, date?: string): Promise<void> 
   }
 }
 
+/**
+ * One entity's history at a time, handed straight to the writer.
+ *
+ * The point is that no more than one vault's snapshots are ever resident.
+ * Accumulating the universe first is what made these jobs scale with the size
+ * of the venue rather than the size of a vault.
+ */
+async function* perEntity(
+  entities: readonly EntityDescriptor[],
+  fetch: (externalId: string) => Promise<RawSnapshot[]>,
+): AsyncGenerator<RawSnapshot[]> {
+  for (const entity of entities) {
+    yield await fetch(entity.externalId);
+  }
+}
+
 async function backfillHyperliquid(db: Db, archive: RawArchive, asOf: Date): Promise<void> {
   const adapter = new HyperliquidSource({
     onRaw: createRawSink(archive, 'hyperliquid', asOf),
@@ -66,18 +82,13 @@ async function backfillHyperliquid(db: Db, archive: RawArchive, asOf: Date): Pro
   const entities = await adapter.listEntities();
   logger.info('hyperliquid backfill universe', { count: entities.length });
 
-  const snapshots: RawSnapshot[] = [];
-  if (adapter.backfill) {
-    for (const entity of entities) {
-      snapshots.push(...(await adapter.backfill(entity.externalId)));
-    }
-  }
+  const backfill = adapter.backfill?.bind(adapter);
 
   await writeBackfillBatch(db, {
     source: 'hyperliquid',
     fetchedAt: new Date(),
     entities,
-    snapshots,
+    snapshots: backfill ? perEntity(entities, backfill) : perEntity([], async () => []),
   });
 }
 
@@ -110,17 +121,17 @@ async function backfillOkx(db: Db, archive: RawArchive, asOf: Date): Promise<voi
   const entities: EntityDescriptor[] = await adapter.listEntities();
   logger.info('okx backfill universe', { count: entities.length });
 
-  const snapshots: RawSnapshot[] = [];
-  if (adapter.backfill) {
+  async function* stream(): AsyncGenerator<RawSnapshot[]> {
+    if (!adapter.backfill) return;
     for (const entity of entities) {
       const series = await adapter.backfill(entity.externalId);
-      snapshots.push(...series);
       const earliest = await adapter.earliestSubpositionDate(entity.externalId);
       logger.info('okx earliest history', {
         externalId: entity.externalId,
         earliest,
         pnlPoints: series.length,
       });
+      yield series;
     }
   }
 
@@ -128,7 +139,7 @@ async function backfillOkx(db: Db, archive: RawArchive, asOf: Date): Promise<voi
     source: 'okx',
     fetchedAt: new Date(),
     entities,
-    snapshots,
+    snapshots: stream(),
   });
 }
 
@@ -144,16 +155,11 @@ async function backfillChamber(db: Db, archive: RawArchive, asOf: Date): Promise
   const entities = await adapter.listEntities();
   logger.info('chamber backfill universe', { count: entities.length });
 
-  const snapshots: RawSnapshot[] = [];
-  for (const entity of entities) {
-    snapshots.push(...(await adapter.backfill(entity.externalId)));
-  }
-
   await writeBackfillBatch(db, {
     source: 'chamber',
     fetchedAt: new Date(),
     entities,
-    snapshots,
+    snapshots: perEntity(entities, (id) => adapter.backfill(id)),
   });
 }
 
@@ -169,16 +175,11 @@ async function backfillEnzyme(db: Db, archive: RawArchive, asOf: Date): Promise<
   const entities = await adapter.listEntities();
   logger.info('enzyme backfill universe', { count: entities.length });
 
-  const snapshots: RawSnapshot[] = [];
-  for (const entity of entities) {
-    snapshots.push(...(await adapter.backfill(entity.externalId)));
-  }
-
   await writeBackfillBatch(db, {
     source: 'enzyme',
     fetchedAt: new Date(),
     entities,
-    snapshots,
+    snapshots: perEntity(entities, (id) => adapter.backfill(id)),
   });
 }
 

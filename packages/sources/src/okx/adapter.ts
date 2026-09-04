@@ -26,6 +26,13 @@ import {
 
 const DEFAULT_BASE = 'https://www.okx.com';
 
+/** A rank, plus the archive key of the page it arrived in. */
+interface RankEntry {
+  instType: OkxInstType;
+  rank: OkxLeadRank;
+  rawName: string;
+}
+
 /**
  * OKX public copy-trading adapter.
  *
@@ -55,7 +62,7 @@ export class OkxSource implements Source {
   private readonly fetch: typeof fetchJson;
   private readonly onRaw?: AdapterHooks['onRaw'];
   private readonly bucket = new TokenBucket(2, 2);
-  private ranks: Array<{ instType: OkxInstType; rank: OkxLeadRank }> | null = null;
+  private ranks: RankEntry[] | null = null;
 
   constructor(options: AdapterHooks & { baseUrl?: string; fetchJson?: typeof fetchJson } = {}) {
     this.baseUrl = (options.baseUrl ?? process.env.OKX_API_BASE ?? DEFAULT_BASE).replace(/\/$/, '');
@@ -70,7 +77,7 @@ export class OkxSource implements Source {
 
   async snapshot(date: Date): Promise<RawSnapshot[]> {
     const ranks = await this.loadRanks();
-    return ranks.map(({ instType, rank }) => ({
+    return ranks.map(({ instType, rank, rawName }) => ({
       source: this.id,
       externalId: externalId(instType, rank.uniqueCode),
       asOf: date,
@@ -79,6 +86,7 @@ export class OkxSource implements Source {
       aumUsd: parseDecimal(rank.aum),
       sampling: 'daily' as const,
       navQuality: 'raw' as const,
+      rawName,
     }));
   }
 
@@ -99,6 +107,7 @@ export class OkxSource implements Source {
       cumPnl: parseDecimal(row.pnl),
       sampling: 'daily' as const,
       navQuality: 'raw' as const,
+      rawName: `pnl/${externalIdValue}`,
     }));
   }
 
@@ -155,22 +164,30 @@ export class OkxSource implements Source {
     return earliest === undefined ? undefined : toIsoDate(dateFromEpochMillis(earliest));
   }
 
-  private async loadRanks(): Promise<Array<{ instType: OkxInstType; rank: OkxLeadRank }>> {
+  private async loadRanks(): Promise<RankEntry[]> {
     if (this.ranks) return this.ranks;
 
-    const combined: Array<{ instType: OkxInstType; rank: OkxLeadRank }> = [];
+    const combined: RankEntry[] = [];
     for (const instType of ['SPOT', 'SWAP'] as const) {
-      const pages = await this.paginateRanks(instType);
-      for (const rank of pages) {
-        combined.push({ instType, rank });
+      for (const entry of await this.paginateRanks(instType)) {
+        combined.push({ instType, ...entry });
       }
     }
     this.ranks = combined;
     return combined;
   }
 
-  private async paginateRanks(instType: OkxInstType): Promise<OkxLeadRank[]> {
-    const ranks: OkxLeadRank[] = [];
+  /**
+   * Ranks paired with the archive key each one arrived in.
+   *
+   * The page number is part of that key, so it has to be captured here — by
+   * the time `loadRanks` has flattened the pages it is gone, and a snapshot
+   * would have no way to say which payload it came from.
+   */
+  private async paginateRanks(
+    instType: OkxInstType,
+  ): Promise<Array<{ rank: OkxLeadRank; rawName: string }>> {
+    const ranks: Array<{ rank: OkxLeadRank; rawName: string }> = [];
     let page = 1;
     let totalPage = 1;
     let dataVer: string | undefined;
@@ -183,10 +200,11 @@ export class OkxSource implements Source {
       };
       if (dataVer) query.dataVer = dataVer;
 
+      const rawName = `lead-traders/${instType}/page-${page}`;
       const raw = await this.get(
         '/api/v5/copytrading/public-lead-traders',
         query,
-        `lead-traders/${instType}/page-${page}`,
+        rawName,
       );
       const parsed = parseOrThrow(
         okxLeadTradersPageSchema,
@@ -201,7 +219,7 @@ export class OkxSource implements Source {
       if (!Number.isFinite(totalPage) || totalPage < 1) {
         throw new Error(`okx lead-traders ${instType}: invalid totalPage ${block.totalPage}`);
       }
-      ranks.push(...block.ranks);
+      for (const rank of block.ranks) ranks.push({ rank, rawName });
       page += 1;
     }
 

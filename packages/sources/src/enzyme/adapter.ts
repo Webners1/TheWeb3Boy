@@ -164,6 +164,8 @@ export class EnzymeSource implements Source {
             : { aumUsd: parseDecimal(vault.grossAssetValue) }),
           sampling: 'daily',
           navQuality: 'reported',
+          // Same key loadVaults archived this deployment's list under.
+          rawName: `vaultList/${deployment.toLowerCase()}`,
         });
       }
     }
@@ -234,6 +236,7 @@ export class EnzymeSource implements Source {
           : { aumUsd: parseDecimal(point.grossAssetValue) }),
         sampling: 'daily',
         navQuality: 'reported',
+        rawName: `vaultTimeSeries/${externalIdValue}`,
       });
     }
 
