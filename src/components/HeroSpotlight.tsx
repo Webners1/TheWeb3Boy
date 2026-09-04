@@ -128,7 +128,7 @@ export default function HeroSpotlight() {
     >
       {/* Layer 1: base environment, dulled */}
       <div
-        className="absolute inset-0 bg-cover bg-center opacity-40 blur-[4px] grayscale-[50%]"
+        className="absolute inset-0 bg-cover bg-center opacity-75 blur-[2px] grayscale-[20%]"
         style={{ backgroundImage: `url(${IMAGE_URL})` }}
       />
 
