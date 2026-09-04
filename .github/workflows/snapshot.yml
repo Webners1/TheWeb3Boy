@@ -1,0 +1,46 @@
+name: snapshot
+
+on:
+  schedule:
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Source id, or "all"'
+        required: false
+        default: 'all'
+        type: string
+      date:
+        description: 'Snapshot date (YYYY-MM-DD). Defaults to today (UTC).'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Run daily snapshot
+        run: pnpm ingest --source=${{ inputs.source || 'all' }} ${{ inputs.date && format('--date={0}', inputs.date) || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
