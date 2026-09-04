@@ -16,12 +16,15 @@ import { Decimal, parseDecimal } from '@vaultbench/shared';
  * verification item in docs/traps.md.
  *
  * OKX publishes money-weighted ROI, which is already an investor-experienced
- * figure — hence `net`, and hence excluded from headline rankings by
- * `nav_quality='reported'`.
+ * figure — hence `net`. Its exclusion from headline rankings is a separate
+ * judgement, made by `RANKABLE` below, not by the fee basis.
  */
 const FEE_BASIS: Record<string, FeeBasis> = {
   hyperliquid: 'gross',
   okx: 'net',
+  // Enzyme's time series field is `net_share_value` — the vendor's own
+  // protobuf names it as net, and fees accrue against the share price on
+  // chain. Applying a haircut on top would double-count.
   enzyme: 'net',
   // dHEDGE takes its performance fee by minting manager shares, which
   // dilutes the token price. The published price is therefore already net.

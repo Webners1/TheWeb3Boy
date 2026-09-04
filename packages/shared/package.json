@@ -11,6 +11,10 @@
     "./decimal": {
       "types": "./src/decimal.ts",
       "default": "./src/decimal.ts"
+    },
+    "./float32": {
+      "types": "./src/float32.ts",
+      "default": "./src/float32.ts"
     }
   },
   "scripts": {

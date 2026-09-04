@@ -9,4 +9,11 @@ export {
   externalId as chamberExternalId,
   type ChamberPeriod,
 } from './chamber/adapter.js';
+export {
+  EnzymeSource,
+  ENZYME_DEPLOYMENTS,
+  externalId as enzymeExternalId,
+  parseExternalId as parseEnzymeExternalId,
+  type EnzymeDeployment,
+} from './enzyme/adapter.js';
 export { parseOrThrow } from './parse.js';

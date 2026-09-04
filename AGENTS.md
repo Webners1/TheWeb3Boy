@@ -53,6 +53,10 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Rule | Enforced by | Kind |
 | --- | --- | --- |
 | No floating point in the data path | `tools/check-harness.mjs` (`no-floating-point`) | automated |
+| A venue that publishes float32 is read at its own precision, not widened | `packages/shared/src/float32.test.ts` | automated |
+| The float32 concession stays confined to the venue that forces it | `tools/check-harness.mjs` (`float32-quarantine`) | automated |
+| A venue's own invalid-price flag overrides the price beside it | `packages/sources/src/enzyme/adapter.test.ts` | automated |
+| An unconfigured source is skipped, never reported as an empty universe | `packages/sources/src/enzyme/adapter.test.ts` | automated |
 | Money columns are Postgres `numeric` | `packages/db/src/schema.test.ts` | automated |
 | Numeric reaches TypeScript as `string` | `packages/db/src/schema.test.ts` | automated |
 | Never hardcode credentials or API keys | `tools/check-harness.mjs` (`no-hardcoded-secrets`) | automated |

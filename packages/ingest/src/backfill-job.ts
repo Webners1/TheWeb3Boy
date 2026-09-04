@@ -8,6 +8,7 @@ import {
 import {
   ChamberSource,
   DefiLlamaPriceSource,
+  EnzymeSource,
   HyperliquidSource,
   OkxSource,
   type EntityDescriptor,
@@ -32,6 +33,15 @@ export async function runBackfill(source: string, date?: string): Promise<void> 
       await backfillDefillama(db, archive, asOf);
       await backfillOkx(db, archive, asOf);
       await backfillChamber(db, archive, asOf);
+      // Skipped rather than fatal when unconfigured — see the same reasoning
+      // in job.ts. Asked for by name below, it throws.
+      if (new EnzymeSource().configured) {
+        await backfillEnzyme(db, archive, asOf);
+      } else {
+        logger.warn('skipping enzyme backfill: ENZYME_API_KEY is not set');
+      }
+    } else if (source === 'enzyme') {
+      await backfillEnzyme(db, archive, asOf);
     } else if (source === 'hyperliquid') {
       await backfillHyperliquid(db, archive, asOf);
     } else if (source === 'defillama') {
@@ -141,6 +151,31 @@ async function backfillChamber(db: Db, archive: RawArchive, asOf: Date): Promise
 
   await writeBackfillBatch(db, {
     source: 'chamber',
+    fetchedAt: new Date(),
+    entities,
+    snapshots,
+  });
+}
+
+/**
+ * Enzyme's history is daily and covers the whole protocol back to 2019, so
+ * this is the largest backfill in the set: one request per vault, and the
+ * vault universe spans four deployments.
+ */
+async function backfillEnzyme(db: Db, archive: RawArchive, asOf: Date): Promise<void> {
+  const adapter = new EnzymeSource({
+    onRaw: createRawSink(archive, 'enzyme', asOf),
+  });
+  const entities = await adapter.listEntities();
+  logger.info('enzyme backfill universe', { count: entities.length });
+
+  const snapshots: RawSnapshot[] = [];
+  for (const entity of entities) {
+    snapshots.push(...(await adapter.backfill(entity.externalId)));
+  }
+
+  await writeBackfillBatch(db, {
+    source: 'enzyme',
     fetchedAt: new Date(),
     entities,
     snapshots,

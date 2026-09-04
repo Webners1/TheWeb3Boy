@@ -88,6 +88,22 @@ const ALL_TABLES = [
 // fixtures. One fetch or one database handle in here and all three lose that.
 // ---------------------------------------------------------------------------
 const CORE_ALLOWED_IMPORTS = new Set(['decimal.js', '@vaultbench/shared/decimal', 'vitest']);
+
+// ---------------------------------------------------------------------------
+// Rule 4b - Float32 quarantine.
+//
+// `@vaultbench/shared/float32` is a deliberate, documented concession to one
+// venue: the Enzyme API declares every numeric field as a 32-bit protobuf
+// float, so its numbers arrive already lossy and there is no keyless
+// alternative. The module's job is to get off the float at the boundary
+// without inventing the digits a double would add.
+//
+// Left unguarded, it is a general-purpose exemption from "no floating point in
+// the data path" that any future adapter could reach for instead of asking the
+// venue for a string. Only the adapter that is actually forced may import it.
+// ---------------------------------------------------------------------------
+const FLOAT32_MODULE = '@vaultbench/shared/float32';
+const FLOAT32_ALLOWED_PREFIX = 'sources/src/enzyme/';
 const IO_GLOBALS = [
   [/\bfetch\s*\(/, 'fetch() is I/O; core takes data as arguments'],
   [/\bprocess\.env\b/, 'reading the environment is I/O; pass configuration in'],
@@ -164,6 +180,19 @@ for (const file of [...new Set(scanTargets)]) {
           `package "${owningPackage}" is not authorized to import ${specifier}`,
         );
       }
+    }
+  }
+
+  if (!isGuard && !relative.startsWith('shared/src/float32')) {
+    for (const specifier of importSpecifiers(code)) {
+      if (specifier !== FLOAT32_MODULE) continue;
+      if (relative.startsWith(FLOAT32_ALLOWED_PREFIX)) continue;
+      fail(
+        'float32-quarantine',
+        file,
+        `${FLOAT32_MODULE} is quarantined to ${FLOAT32_ALLOWED_PREFIX}; ` +
+          'parse the source as a decimal string instead of a float',
+      );
     }
   }
 
