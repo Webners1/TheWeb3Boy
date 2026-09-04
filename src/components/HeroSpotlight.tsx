@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useMotionValue, useSpring, useMotionTemplate } from "framer-motion";
+import { motion, useSpring, useMotionTemplate } from "framer-motion";
 
 /**
  * "Magic Lens Object Identification" hero background.
@@ -23,6 +23,12 @@ const IMG_H = 500;
 
 const LENS_RADIUS = 70;
 
+// Must live outside the component. A fresh object here re-initialises
+// useSpring on every render, and because MotionValue.set() is a no-op when
+// the value hasn't changed, an axis that isn't currently moving (e.g. Y
+// while you track sideways) would stay stuck at whatever the reset left it.
+const SPRING_CONFIG = { stiffness: 400, damping: 40 };
+
 type HotspotDef = {
   id: string;
   label: string;
@@ -42,7 +48,9 @@ const HOTSPOT_DEFS: HotspotDef[] = [
   { id: "pc", label: "My PC, main monitors", uLeft: 0.057, uRight: 0.57, vTop: 0.624, vBottom: 0.08 },
   { id: "laptop", label: "My laptop", uLeft: 0.057, uRight: 0.2, vTop: 0.244, vBottom: 0.0 },
   { id: "mic", label: "My podcast mic and camera setup", uLeft: 0.333, uRight: 0.379, vTop: 0.254, vBottom: 0.064 },
-  { id: "led1", label: "RGB LED setup", uLeft: 0.34, uRight: 0.372, vTop: 0.22, vBottom: 0.104 },
+  // Kept deliberately small: the red band sits on the mic body, so a large
+  // box here would cover the mic's own hotspot and make it unhoverable.
+  { id: "led1", label: "RGB LED setup", uLeft: 0.342, uRight: 0.37, vTop: 0.228, vBottom: 0.19 },
   { id: "led2", label: "LED indicator", uLeft: 0.307, uRight: 0.323, vTop: 0.212, vBottom: 0.172 },
   { id: "face", label: "This is me, the Web 3 Boy", uLeft: 0.433, uRight: 0.66, vTop: 0.96, vBottom: 0.0 },
 ];
@@ -98,31 +106,39 @@ export default function HeroSpotlight() {
   const [isHovering, setIsHovering] = useState(false);
   const rects = useHotspotRects(containerRef);
 
-  // Raw cursor position, relative to the container. Plain motion values -
-  // updating these never triggers a React re-render.
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  // Smoothed, trailing version of the same position for the lens/tooltip.
-  const springConfig = { stiffness: 400, damping: 40 };
-  const smoothX = useSpring(mouseX, springConfig);
-  const smoothY = useSpring(mouseY, springConfig);
+  // Springs are driven directly with .set() rather than bound to a source
+  // motion value. Binding to a source meant the subscription could be reset
+  // by the re-render that hover state triggers, stranding an axis at its
+  // last value until that axis happened to change again.
+  const smoothX = useSpring(0, SPRING_CONFIG);
+  const smoothY = useSpring(0, SPRING_CONFIG);
 
   const maskImage = useMotionTemplate`radial-gradient(circle ${LENS_RADIUS}px at ${smoothX}px ${smoothY}px, black 100%, transparent 100%)`;
   const transformOrigin = useMotionTemplate`${smoothX}px ${smoothY}px`;
 
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function track(e: React.PointerEvent<HTMLDivElement>) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    mouseX.set(e.clientX - rect.left);
-    mouseY.set(e.clientY - rect.top);
+    smoothX.set(e.clientX - rect.left);
+    smoothY.set(e.clientY - rect.top);
+  }
+
+  function handlePointerEnter(e: React.PointerEvent<HTMLDivElement>) {
+    // Jump straight to the entry point so the lens doesn't sweep in from
+    // wherever it was left, then fade/scale in from there.
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      smoothX.jump(e.clientX - rect.left);
+      smoothY.jump(e.clientY - rect.top);
+    }
+    setIsHovering(true);
   }
 
   return (
     <div
       ref={containerRef}
-      onPointerMove={handlePointerMove}
-      onPointerEnter={() => setIsHovering(true)}
+      onPointerMove={track}
+      onPointerEnter={handlePointerEnter}
       onPointerLeave={() => setIsHovering(false)}
       className="relative isolate h-full w-full overflow-hidden bg-black"
     >
@@ -131,6 +147,12 @@ export default function HeroSpotlight() {
         className="absolute inset-0 bg-cover bg-center opacity-75 blur-[2px] grayscale-[20%]"
         style={{ backgroundImage: `url(${IMAGE_URL})` }}
       />
+
+      {/* Layer 1b: reading scrim. Lives inside the spotlight and *below* the
+          lens, so the lens punches through it - if this sat above everything
+          it would dim the reveal just as much as the base, leaving nothing
+          to reveal. */}
+      <div className="hero-scrim pointer-events-none absolute inset-0 z-[5]" />
 
       {/* Layer 2: hotspot map */}
       <div className="absolute inset-0 z-10">
@@ -153,6 +175,7 @@ export default function HeroSpotlight() {
           maskImage,
           WebkitMaskImage: maskImage,
           transformOrigin,
+          filter: "brightness(1.45) contrast(1.05) saturate(1.15)",
         }}
         animate={{ scale: isHovering ? 1.5 : 1, opacity: isHovering ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}

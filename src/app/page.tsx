@@ -24,7 +24,6 @@ export default function Home() {
         <div className="absolute inset-0">
           <HeroSpotlight />
         </div>
-        <div className="hero-scrim" />
         <div className="wrap hero-inner">
           <p className="eyebrow teal fade-up d1">6 years in Web3 &amp; AI · Karachi, PK</p>
           <h1 className="headline-kinetic">

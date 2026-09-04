@@ -17,7 +17,10 @@
   --font-mono: 'IBM Plex Mono', monospace;
 }
 
-*{box-sizing:border-box;padding:0;margin:0;}
+/* Only box-sizing here. Tailwind's preflight already zeroes margin/padding,
+   and a `*{padding:0;margin:0}` rule in this (unlayered) file would beat
+   Tailwind's @layer utilities and silently kill every p-*/m-* utility. */
+*{box-sizing:border-box;}
 html{scroll-behavior:smooth;height:100%;}
 html,body{max-width:100vw;overflow-x:hidden;}
 body{
@@ -32,7 +35,11 @@ a{color:inherit;}
 h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;}
 p{margin:0;}
 
-.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,4vw,64px);}
+/* width:100% matters inside #hero: it's a flex column, and the `margin:0 auto`
+   here disables cross-axis stretch, so without an explicit width the block
+   shrink-wraps its content and re-centres every time the headline word
+   cycles - the whole hero text visibly jumps sideways. */
+.wrap{max-width:var(--maxw);width:100%;margin:0 auto;padding:0 clamp(20px,4vw,64px);}
 
 .grain{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0.5;mix-blend-mode:overlay;
   background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
