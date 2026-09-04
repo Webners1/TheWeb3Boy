@@ -601,3 +601,24 @@ each holding `Decimal`s. The job would have died of heap exhaustion after
 twenty minutes of polite fetching, with nothing written. History is now an
 async iterable, one entity at a time, each committed in its own transaction
 so an interrupted run leaves what it reached.
+
+## 26. A colon in an archive key is an NTFS stream on Windows
+
+`:` is a legal filename character on Linux and an Alternate Data Stream
+separator on Windows. The Enzyme backfill archived each vault as
+`vaultTimeSeries/ethereum:0x….json.gz`. On this machine that wrote a 0-byte
+file named `ethereum` and hid every payload as a named stream. Chamber's
+`tokenPriceHistory/base:0x…` did the same.
+
+`Get-ChildItem`, `git`, `rsync`, a zip, and a copy to another OS all see the
+empty host file. The backfill logged `ok`. 1.1 million snapshot rows pointed
+at paths that a Linux box cannot open. The data was there — `dir /r` listed
+the streams — and would have vanished the first time anyone backed up
+`var/archive`.
+
+`archiveObjectKey` now turns `:` into `/`, so `ethereum:0xabc` lands at
+`ethereum/0xabc.json.gz`. `LocalFileArchive.put` refuses any remaining
+`<>:"|?*` rather than write a key Windows cannot store as a real file. The
+existing streams were lifted into portable files by
+`tools/recover-ntfs-streams.mjs` and the stored `raw_ref` values were
+rewritten to match. Do not put a colon in an object key, on any OS.

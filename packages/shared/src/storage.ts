@@ -21,6 +21,7 @@ export class LocalFileArchive implements RawArchive {
   constructor(private readonly rootDir: string) {}
 
   async put(key: string, payload: Buffer | string): Promise<'written' | 'exists'> {
+    assertSafeArchiveKey(key);
     const root = path.resolve(this.rootDir);
     const target = path.resolve(root, key);
     if (!target.startsWith(root + path.sep)) {
@@ -107,6 +108,44 @@ export function resolveArchiveRoot(configured: string | undefined): string {
  * Nearest ancestor holding `pnpm-workspace.yaml`. Falls back to the working
  * directory, which is only reached when running outside the repository.
  */
+/**
+ * Characters that cannot appear in a portable archive key.
+ *
+ * `:` is legal on Linux and an NTFS Alternate Data Stream separator on
+ * Windows. A key of `vaultTimeSeries/ethereum:0xabc.json.gz` writes a
+ * 0-byte file named `ethereum` and hides the payload in a named stream.
+ * `Get-ChildItem`, `git`, `rsync` and a copy to another machine all see an
+ * empty file. Found after a "successful" Enzyme backfill of 1.1M rows:
+ * every history payload was an ADS on one file. Chamber's
+ * `tokenPriceHistory/base:0x…` had the same shape.
+ *
+ * The other characters are Windows-illegal in a path segment. Rejecting
+ * them here means a Linux CI cannot write a key a Windows developer cannot
+ * read.
+ */
+const ILLEGAL_ARCHIVE_CHAR = /[<>:"|?*]/;
+
+/**
+ * Turn an adapter's archive name into a portable object key.
+ *
+ * `:` becomes `/`, so `ethereum:0xabc` lands at `ethereum/0xabc.json.gz`
+ * rather than as a named stream. Everything else is left alone; if that
+ * still contains an illegal character, `LocalFileArchive.put` refuses it.
+ */
+export function archiveObjectKey(source: string, day: string, name: string): string {
+  const safe = name.replaceAll(':', '/');
+  return `raw/${source}/${day}/${safe}.json.gz`;
+}
+
+export function assertSafeArchiveKey(key: string): void {
+  if (ILLEGAL_ARCHIVE_CHAR.test(key)) {
+    throw new Error(
+      `archive key is not portable (illegal character): ${key}. ` +
+        'Replace ":" with "/" in the adapter name; do not write NTFS streams.',
+    );
+  }
+}
+
 function workspaceRoot(): string {
   let dir = process.cwd();
   for (;;) {

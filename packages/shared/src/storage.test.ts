@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { LocalFileArchive, resolveArchiveRoot } from './storage.js';
+import { archiveObjectKey, LocalFileArchive, resolveArchiveRoot } from './storage.js';
 
 describe('resolveArchiveRoot', () => {
   const originalCwd = process.cwd();
@@ -73,5 +73,25 @@ describe('LocalFileArchive', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'vaultbench-archive-'));
     const archive = new LocalFileArchive(root);
     await expect(archive.put('../escaped.json', 'x')).rejects.toThrow(/escapes root/);
+  });
+
+  it('refuses a colon, which Windows would silently turn into a named stream', async () => {
+    // The Enzyme backfill wrote 1.1M rows whose payloads all landed as NTFS
+    // Alternate Data Streams on one 0-byte file named `ethereum`. `:` is
+    // legal on Linux and a stream separator on Windows. Fail here rather
+    // than write a file nothing portable can see.
+    const root = mkdtempSync(path.join(tmpdir(), 'vaultbench-archive-'));
+    const archive = new LocalFileArchive(root);
+    await expect(archive.put('raw/enzyme/2026-09-04/vaultTimeSeries/ethereum:0xabc.json.gz', 'x')).rejects.toThrow(
+      /not portable/,
+    );
+  });
+});
+
+describe('archiveObjectKey', () => {
+  it('turns a colon in the adapter name into a directory separator', () => {
+    expect(archiveObjectKey('enzyme', '2026-09-04', 'vaultTimeSeries/ethereum:0xabc')).toBe(
+      'raw/enzyme/2026-09-04/vaultTimeSeries/ethereum/0xabc.json.gz',
+    );
   });
 });

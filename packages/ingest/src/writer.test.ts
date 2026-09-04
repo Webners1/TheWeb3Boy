@@ -244,7 +244,7 @@ describe('writeBackfillBatch', () => {
     expect(rows[0]?.asOf).toBe('2023-12-21');
     // Run date in the path, and the adapter's own archive name.
     expect(rows[0]?.rawRef).toBe(
-      'raw/chamber/2026-09-04/tokenPriceHistory/base:0xabc.json.gz',
+      'raw/chamber/2026-09-04/tokenPriceHistory/base/0xabc.json.gz',
     );
   });
 

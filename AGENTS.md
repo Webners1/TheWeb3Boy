@@ -67,6 +67,7 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Raw payloads are append-only | `LocalFileArchive.put` opens with `wx`; snapshots are keyed `(entity_id, as_of)` | automated |
 | Every job archives to one root, whichever package runs it | `packages/shared/src/storage.test.ts` (`resolveArchiveRoot`) | automated |
 | `raw_ref` names a payload the adapter actually archived | `packages/sources/src/raw-name.test.ts`; `packages/ingest/src/writer.test.ts` | automated |
+| Archive keys are portable path segments, never NTFS streams | `packages/shared/src/storage.test.ts` (`archiveObjectKey`, colon rejected) | automated |
 | Pre-Commit Guard runs native checks | `.githooks/pre-commit` — install with `pnpm run hooks:install` | automated |
 | `snapshot.yml` fails loudly on non-zero exit | `.github/workflows/snapshot.yml` runs the guard, typecheck and tests before ingest | automated |
 | No paid APIs | review-time | judgement |
