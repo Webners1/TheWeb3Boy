@@ -208,6 +208,15 @@ export const entityMetrics = pgTable(
     alphaBtc: rate('alpha_btc'),
     alphaEth: rate('alpha_eth'),
     alphaSol: rate('alpha_sol'),
+    // Gearing against each benchmark, and how much of the entity's variance
+    // that benchmark explains. Stored next to alpha because alpha read on its
+    // own invites calling leverage skill — trap 21.
+    betaBtc: rate('beta_btc'),
+    betaEth: rate('beta_eth'),
+    betaSol: rate('beta_sol'),
+    rSquaredBtc: rate('r_squared_btc'),
+    rSquaredEth: rate('r_squared_eth'),
+    rSquaredSol: rate('r_squared_sol'),
     maxDrawdown: rate('max_drawdown'),
     volatility: rate('volatility'),
     followerMedianReturn: rate('follower_median_return'),

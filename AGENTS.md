@@ -81,6 +81,7 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Coverage travels with every figure | `entity_metrics.days_covered`/`is_full_window`/`sampling` are `NOT NULL`, asserted in `schema.test.ts` | automated |
 | `is_full_window` means the record spans the window, not that a day count was met | `spansWindow` in `packages/core/src/series.ts` + `metrics.test.ts` (sampling parity, stale record) | automated |
 | Money-weighted ROI is excluded from headline rankings | `packages/core/src/fees.ts` `isHeadlineEligible` + `recompute.test.ts` | automated |
+| Alpha never travels without beta | `alpha_*` caveats name `beta_*` in `metric-definitions.ts`; `packages/core/src/beta.test.ts` | automated |
 | An unverified venue is not ranked | `isSourceRankable` in `packages/compute/src/fees.ts` + `recompute.test.ts` | automated |
 | Strategy categories are hand-assigned, never guessed | `packages/ingest/src/strategy-tags.test.ts` | automated |
 | Chamber chain codes are checked against the response | `packages/sources/src/chamber/adapter.test.ts` | automated |

@@ -361,7 +361,7 @@ are the same field by the vendor's own spec, nothing is invented, and a third
 spelling still fails the parse.
 
 
-## 21. Open: alpha over a benchmark is meaningless without leverage
+## 21. Alpha over a benchmark is meaningless without leverage
 
 Verified against real data, and it is the first thing a reader will see.
 
@@ -395,22 +395,71 @@ is hand-tagged and nothing has tagged the Chamber universe yet
 know the comparison is apples-to-apples-with-a-multiplier. It still would not
 carry the multiplier.
 
-This is unresolved, and it must be resolved before an entity card ranks
-anything, because a chart is far more persuasive than a JSON field. The
-options, none yet chosen:
+**Resolved by publishing beta.** `entity_metrics` now carries `beta_btc`,
+`beta_eth`, `beta_sol` and an `r_squared_*` for each, computed in
+`packages/core/src/beta.ts` from data already held — no new source. Beta was
+the cheapest of the three options considered and the least presumptuous, and
+it does not preclude gating on `strategy_category` or ranking on a
+risk-adjusted figure later.
 
-1. Publish beta against each benchmark alongside alpha. Computable from data
-   already held, in `packages/core`, with no new source. Makes the leverage
-   visible as a number rather than as a vault name.
-2. Require `strategy_category` to be non-null for `headline_eligible`. Honest,
-   and it empties the rankings until the tagging is done.
-3. Rank on a risk-adjusted figure rather than raw TWR, so 189% volatility
-   costs the vault its top spot.
+On the same real 90-day window it does the job, and caught more than the vault
+that prompted it:
 
-Option 1 is the cheapest and the least presumptuous, and it does not preclude
-the others. Whatever is chosen, "Ethereum Bull 3X tops the table with 174
-points of alpha over ETH" must not be a sentence this project can be quoted
-as saying.
+| name | `alpha_eth` | `beta_eth` | `r_squared_eth` |
+| --- | --- | --- | --- |
+| Ethereum Bull 3X | 1.74 | 2.92 | 0.84 |
+| Ethereum Maximizer | 0.77 | 1.95 | 0.74 |
+| Archipelago Investment Firm | 0.08 | 0.96 | 0.86 |
+| HODLINDICATOR | 0.07 | 0.96 | 0.86 |
+
+"Ethereum Maximizer" is the case that justifies the work. It is roughly 2x
+geared and **its name does not say so** — no amount of reading vault names
+would have caught it, and a hand-applied `strategy_category` of `directional`
+would have flagged it as market-exposed without ever revealing the multiplier.
+Beta reads the leverage off the returns themselves. ("Test neutral Base", at
+beta 0.97, is named neutral and is nothing of the kind.)
+
+Three things learned in the doing:
+
+- **Beta must never be published without r-squared.** A beta of 3 explaining
+  98% of variance is a leveraged tracker; the same beta explaining 5% is two
+  noisy series coinciding, and presenting that as gearing is its own lie.
+- **Beta against the wrong benchmark invents leverage.** The same "Ethereum
+  Bull 3X" vault reports three betas, and only one of them means anything:
+
+  | benchmark | `beta` | `r_squared` |
+  | --- | --- | --- |
+  | ETH | 2.92 | 0.84 |
+  | BTC | 4.02 | 0.68 |
+  | SOL | 2.03 | 0.42 |
+
+  Read off the BTC row alone, this is a 4x leveraged BTC position. It is
+  nothing of the kind — it is 3x ETH, and the BTC and SOL figures are
+  artifacts of how far ETH moves with them. Majors are correlated enough that
+  a geared bet on one produces a plausible-looking beta against all three.
+  The r-squared column is what picks the right lens: highest explained
+  variance identifies the benchmark the entity is actually geared to. A
+  consumer that shows one benchmark's beta without its r-squared will
+  confidently state the wrong multiple against the wrong asset.
+- **Returns must be paired over identical intervals.** An entity series may be
+  `downsampled` to ~2-day spacing while benchmark closes are daily, and
+  pairing by position would regress 2-day returns on 1-day returns — a step
+  against half a step. Even with exact pairing the figure is an estimate on a
+  downsampled series: a product rebalanced to 2x *daily* reads about 2.11 when
+  measured on alternate days, because two geared daily steps do not compose
+  into one geared two-day step. That convexity is the same effect that decays
+  leveraged ETFs in choppy markets, and it is why the observed 2.92 for a
+  nominal 3x is right rather than a bug.
+
+Null means "cannot say", never zero: beta is undefined below three paired
+intervals and when the benchmark did not move, and a zero there would assert
+market-neutrality.
+
+What remains: nothing here blocks a ranking, but `alpha_*` is still the
+tempting sort key. The caveat text on all three alpha rows in
+`metric_definitions` now names `beta_*` explicitly, so an agent reading the
+table cannot obtain the return difference without being told what would
+explain it. A UI must show beta next to alpha for the same reason.
 
 ## 22. A secret scanner that only reads code is not a secret scanner
 

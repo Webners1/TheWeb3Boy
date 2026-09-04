@@ -111,7 +111,7 @@
               "string",
               "null"
             ],
-            "description": "twr − benchTwrBtc.",
+            "description": "twr − benchTwrBtc. Not a skill measure on its own: read betaBtc alongside it, because a leveraged long on BTC produces large alpha of either sign purely from gearing.",
             "example": "0.1432"
           },
           "alphaEth": {
@@ -123,6 +123,54 @@
             "example": "0.1432"
           },
           "alphaSol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "betaBtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Slope of the entity's returns against BTC's over the same window. 1 tracks, 3 is roughly 3x geared, 0 is market-neutral, negative is short. Null means the figure is not computable, not zero.",
+            "example": "0.1432"
+          },
+          "betaEth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "betaSol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "rSquaredBtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Share of variance BTC explains, 0 to 1. Tells you whether betaBtc is gearing or coincidence: beta 3 at r² 0.98 is a leveraged tracker, beta 3 at r² 0.05 is noise.",
+            "example": "0.1432"
+          },
+          "rSquaredEth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "rSquaredSol": {
             "type": [
               "string",
               "null"
@@ -175,6 +223,12 @@
           "alphaBtc",
           "alphaEth",
           "alphaSol",
+          "betaBtc",
+          "betaEth",
+          "betaSol",
+          "rSquaredBtc",
+          "rSquaredEth",
+          "rSquaredSol",
           "maxDrawdown",
           "volatility",
           "followerMedianReturn",

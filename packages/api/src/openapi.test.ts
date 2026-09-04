@@ -71,6 +71,8 @@ describe('money never crosses the wire as a float', () => {
   const moneyFields = [
     ['Metrics', 'twr'],
     ['Metrics', 'alphaBtc'],
+    ['Metrics', 'betaBtc'],
+    ['Metrics', 'rSquaredBtc'],
     ['Metrics', 'followerGap'],
     ['NavPoint', 'valuePerUnit'],
     ['IndexPoint', 'value'],

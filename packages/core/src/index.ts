@@ -4,6 +4,7 @@ export * from './flows.js';
 export * from './nav.js';
 export * from './twr.js';
 export * from './benchmark.js';
+export * from './beta.js';
 export * from './rebase.js';
 export * from './risk.js';
 export * from './followers.js';

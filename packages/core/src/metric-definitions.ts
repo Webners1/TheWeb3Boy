@@ -17,6 +17,56 @@ export interface MetricDefinition {
   caveats: string;
 }
 
+/**
+ * Why alpha must never be read alone.
+ *
+ * Attached to all three alpha rows so an agent reading the table cannot get
+ * the return difference without also being told what would explain it.
+ */
+const ALPHA_CAVEAT =
+  'Meaningless without beta: a 3x leveraged long on the benchmark shows enormous positive ' +
+  'alpha in a rising market and enormous negative alpha in a falling one, and neither is ' +
+  'manager skill. Read beta_* and r_squared_* alongside this, and strategy_category, before ' +
+  'treating it as a verdict. ';
+
+/** Beta and r-squared for one benchmark. Identical wording, three assets. */
+function betaDefinitions(suffix: string, asset: string): MetricDefinition[] {
+  return [
+    {
+      key: `beta_${suffix}`,
+      label: `Beta vs ${asset}`,
+      description:
+        `Slope of the entity's periodic returns regressed on ${asset}'s over the same ` +
+        'window and the same intervals. 1 tracks the benchmark, 3 is roughly three times ' +
+        'geared, 0 is market-neutral, negative is short.',
+      unit: 'fraction',
+      direction: 'neutral',
+      caveats:
+        `Read with r_squared_${suffix}: a beta of 3 explaining 98% of variance is a ` +
+        'leveraged tracker, while the same beta explaining 5% is two noisy series ' +
+        'coinciding. Undefined (null) with fewer than three paired return intervals, or ' +
+        `when ${asset} did not move over the window — null means "cannot say", not zero. ` +
+        'On a downsampled series the figure is an estimate: a product rebalanced to 2x ' +
+        'daily reads about 2.11 when measured on alternate days, because two geared daily ' +
+        'steps do not compose into one geared two-day step. ' +
+        DOWNSAMPLED_CAVEAT,
+    },
+    {
+      key: `r_squared_${suffix}`,
+      label: `R² vs ${asset}`,
+      description:
+        `Share of the entity's return variance explained by ${asset} over the window, from ` +
+        '0 to 1. This is what tells you whether the beta is gearing or coincidence.',
+      unit: 'fraction',
+      direction: 'neutral',
+      caveats:
+        'A high value does not mean good or bad, only that the benchmark explains the ' +
+        'movement. Null exactly when beta is null. ' +
+        DOWNSAMPLED_CAVEAT,
+    },
+  ];
+}
+
 const DOWNSAMPLED_CAVEAT =
   "Unreliable when sampling='downsampled': backfilled Hyperliquid history is ~93 points " +
   'across a vault lifetime, so intermediate moves are absent.';
@@ -76,8 +126,8 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
     unit: 'fraction',
     direction: 'higher_is_better',
     caveats:
-      'A market-neutral strategy losing to BTC in a bull run is not underperforming; read ' +
-      'strategy_category before treating this as a verdict. ' +
+      'A market-neutral strategy losing to BTC in a bull run is not underperforming. ' +
+      ALPHA_CAVEAT +
       DOWNSAMPLED_CAVEAT,
   },
   {
@@ -88,7 +138,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
       'entity fees. Positive means the entity beat the benchmark.',
     unit: 'fraction',
     direction: 'higher_is_better',
-    caveats: 'Read strategy_category before treating this as a verdict. ' + DOWNSAMPLED_CAVEAT,
+    caveats: ALPHA_CAVEAT + DOWNSAMPLED_CAVEAT,
   },
   {
     key: 'alpha_sol',
@@ -98,8 +148,11 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
       'entity fees. Positive means the entity beat the benchmark.',
     unit: 'fraction',
     direction: 'higher_is_better',
-    caveats: 'Read strategy_category before treating this as a verdict. ' + DOWNSAMPLED_CAVEAT,
+    caveats: ALPHA_CAVEAT + DOWNSAMPLED_CAVEAT,
   },
+  ...betaDefinitions('btc', 'BTC'),
+  ...betaDefinitions('eth', 'ETH'),
+  ...betaDefinitions('sol', 'SOL'),
   {
     key: 'max_drawdown',
     label: 'Maximum drawdown',

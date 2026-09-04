@@ -1,6 +1,7 @@
 import type { Decimal } from '@vaultbench/shared/decimal';
 
 import { alignCloses, alpha, benchmarkTwr } from './benchmark.js';
+import { beta, type Beta } from './beta.js';
 import { isHeadlineEligible, netOfFees, type FeeProfile } from './fees.js';
 import { followerDistribution, followerGap } from './followers.js';
 import { maxDrawdown, volatility } from './risk.js';
@@ -39,6 +40,18 @@ export interface EntityMetrics {
   alphaBtc?: Decimal;
   alphaEth?: Decimal;
   alphaSol?: Decimal;
+  /**
+   * Gearing against each benchmark, with the share of variance it explains.
+   *
+   * Published alongside alpha because alpha without it invites the reader to
+   * call leverage skill. See `beta.ts` and trap 21.
+   */
+  betaBtc?: Decimal;
+  betaEth?: Decimal;
+  betaSol?: Decimal;
+  rSquaredBtc?: Decimal;
+  rSquaredEth?: Decimal;
+  rSquaredSol?: Decimal;
   maxDrawdown?: Decimal;
   volatility?: Decimal;
   followerMedianReturn?: Decimal;
@@ -95,6 +108,17 @@ export function computeEntityMetrics(input: MetricsInput): EntityMetrics {
   const benchEth = benchmarkFor(input.benchmarks.ETH);
   const benchSol = benchmarkFor(input.benchmarks.SOL);
 
+  // Beta uses the same window and the same aligned closes as alpha, so the
+  // two are always describing one comparison rather than two.
+  const betaFor = (closes: readonly BenchmarkClose[] | undefined): Beta | undefined => {
+    if (closes === undefined) return undefined;
+    return beta(window.points, alignCloses(closes, first.asOf, last.asOf));
+  };
+
+  const betaBtc = betaFor(input.benchmarks.BTC);
+  const betaEth = betaFor(input.benchmarks.ETH);
+  const betaSol = betaFor(input.benchmarks.SOL);
+
   const followers = input.depositors ? followerDistribution(input.depositors) : undefined;
   const vol = volatility(window.points);
 
@@ -107,6 +131,12 @@ export function computeEntityMetrics(input: MetricsInput): EntityMetrics {
     alphaBtc: alpha(netTwr, benchBtc),
     alphaEth: alpha(netTwr, benchEth),
     alphaSol: alpha(netTwr, benchSol),
+    betaBtc: betaBtc?.beta,
+    betaEth: betaEth?.beta,
+    betaSol: betaSol?.beta,
+    rSquaredBtc: betaBtc?.rSquared,
+    rSquaredEth: betaEth?.rSquared,
+    rSquaredSol: betaSol?.rSquared,
     maxDrawdown: maxDrawdown(window.points),
     volatility: vol?.annualised,
     followerMedianReturn: followers?.medianReturn,

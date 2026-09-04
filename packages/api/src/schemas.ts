@@ -106,9 +106,29 @@ export const metricsSchema = z
     benchTwrBtc: decimalString.nullable(),
     benchTwrEth: decimalString.nullable(),
     benchTwrSol: decimalString.nullable(),
-    alphaBtc: decimalString.nullable().openapi({ description: 'twr − benchTwrBtc.' }),
+    alphaBtc: decimalString.nullable().openapi({
+      description:
+        'twr − benchTwrBtc. Not a skill measure on its own: read betaBtc alongside it, ' +
+        'because a leveraged long on BTC produces large alpha of either sign purely from ' +
+        'gearing.',
+    }),
     alphaEth: decimalString.nullable(),
     alphaSol: decimalString.nullable(),
+    betaBtc: decimalString.nullable().openapi({
+      description:
+        "Slope of the entity's returns against BTC's over the same window. 1 tracks, 3 is " +
+        'roughly 3x geared, 0 is market-neutral, negative is short. Null means the figure ' +
+        'is not computable, not zero.',
+    }),
+    betaEth: decimalString.nullable(),
+    betaSol: decimalString.nullable(),
+    rSquaredBtc: decimalString.nullable().openapi({
+      description:
+        'Share of variance BTC explains, 0 to 1. Tells you whether betaBtc is gearing or ' +
+        'coincidence: beta 3 at r² 0.98 is a leveraged tracker, beta 3 at r² 0.05 is noise.',
+    }),
+    rSquaredEth: decimalString.nullable(),
+    rSquaredSol: decimalString.nullable(),
     maxDrawdown: decimalString.nullable(),
     volatility: decimalString.nullable().openapi({
       description: 'Annualised standard deviation of period returns.',
