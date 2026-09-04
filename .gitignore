@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 review-shots/
+
+# keep the documented example env
+!.env.example

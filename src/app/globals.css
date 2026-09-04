@@ -17,9 +17,10 @@
   --font-mono: 'IBM Plex Mono', monospace;
 }
 
-/* Only box-sizing here. Tailwind's preflight already zeroes margin/padding,
-   and a `*{padding:0;margin:0}` rule in this (unlayered) file would beat
-   Tailwind's @layer utilities and silently kill every p-*/m-* utility. */
+/* Only box-sizing here. Tailwind's preflight already zeroes margin and
+   padding, and a universal padding/margin reset in this (unlayered) file
+   would beat Tailwind's @layer utilities, silently killing every spacing
+   utility such as px-3 and py-1.5. */
 *{box-sizing:border-box;}
 html{scroll-behavior:smooth;height:100%;}
 html,body{max-width:100vw;overflow-x:hidden;}
@@ -235,8 +236,65 @@ footer{border-top:1px solid var(--line);padding:26px clamp(20px,4vw,64px);displa
 
 a:focus-visible, button:focus-visible{outline:2px solid var(--teal);outline-offset:3px;}
 
+/* --- dashboard: controls --- */
+.controls{display:flex;flex-wrap:wrap;gap:26px 34px;padding:24px 0 32px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:40px;}
+.control{display:flex;flex-direction:column;gap:10px;}
+.control-grow{flex:1;min-width:220px;}
+.control-label{font-family:var(--font-mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);}
+.chip-row,.amount-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.chip{
+  font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.05em;text-transform:uppercase;
+  color:var(--text-dim);background:transparent;border:1px solid var(--line-strong);
+  padding:8px 12px;border-radius:2px;cursor:pointer;
+  transition:color .25s ease,border-color .25s ease,background .25s ease;
+}
+.chip:hover{color:var(--text);border-color:var(--text-faint);}
+.chip-on{color:#140D08;background:var(--teal);border-color:var(--teal);}
+.chip-on:hover{color:#140D08;background:var(--teal);}
+.select,.amount-input,.search-input{
+  font-family:var(--font-mono);font-size:12.5px;color:var(--text);
+  background:var(--bg);border:1px solid var(--line-strong);padding:8px 12px;border-radius:2px;
+}
+.amount-input{width:130px;}
+.search-input{width:100%;}
+.select:focus-visible,.amount-input:focus-visible,.search-input:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+/* --- dashboard: comparison panel --- */
+.compare-panel{border:1px solid var(--line-strong);padding:26px;margin-bottom:48px;}
+.compare-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
+.compare-eyebrow{font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.08em;color:var(--text-faint);margin-bottom:8px;}
+.compare-title{font-family:var(--font-display);font-weight:700;font-size:clamp(1.5rem,3.4vw,2.3rem);color:var(--teal);}
+.compare-title .vs{font-family:var(--font-mono);font-size:0.8rem;font-weight:400;color:var(--text-faint);text-transform:lowercase;}
+.compare-title .btc{color:var(--copper);}
+.compare-verdict{font-family:var(--font-mono);font-size:12.5px;margin-top:10px;}
+.compare-verdict.good{color:var(--teal);}
+.compare-verdict.bad{color:var(--copper);}
+.api-note{font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--text-faint);margin-top:14px;max-width:760px;}
+.error-note{font-family:var(--font-mono);font-size:12px;color:var(--copper-bright);border-left:2px solid var(--copper);padding-left:12px;margin:12px 0;}
+.coverage-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+.legend-row{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);}
+
+/* --- dashboard: chart --- */
+.chart-wrap{margin-top:8px;}
+.chart-svg{width:100%;height:auto;display:block;overflow:visible;}
+.chart-grid{stroke:var(--line);stroke-width:1;}
+.chart-baseline{stroke:var(--line-strong);stroke-width:1;stroke-dasharray:4 5;}
+.chart-cursor{stroke:var(--line-strong);stroke-width:1;}
+.chart-axis-text{fill:var(--text-faint);font-family:var(--font-mono);font-size:11px;}
+.chart-value-text{font-family:var(--font-mono);font-size:11.5px;font-variant-numeric:tabular-nums;}
+.chart-hover-date{font-family:var(--font-mono);font-size:11px;color:var(--text-faint);margin-top:6px;}
+.chart-empty{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);padding:28px 0;}
+
 /* --- dashboard --- */
 .dash{min-height:100vh;}
+.window-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);margin-left:12px;}
+.vault-table tbody tr{cursor:pointer;}
+.vault-table tbody tr.row-selected td{background:rgba(95,216,201,0.08);color:var(--text);}
+.vault-table td.pos{color:var(--teal);}
+.vault-table td.neg{color:var(--copper);}
+.row-cta{font-family:var(--font-mono);font-size:11px;color:var(--teal);opacity:0;transition:opacity .2s ease;}
+.vault-table tbody tr:hover .row-cta{opacity:1;}
+.empty-row{text-align:center;padding:32px 0;color:var(--text-faint);}
 .dash-header{border-bottom:1px solid var(--line);padding:16px clamp(20px,4vw,64px);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
 .dash-back{font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;transition:color .3s ease;}
 .dash-back:hover{color:var(--teal);}
