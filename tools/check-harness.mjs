@@ -90,20 +90,20 @@ const ALL_TABLES = [
 const CORE_ALLOWED_IMPORTS = new Set(['decimal.js', '@vaultbench/shared/decimal', 'vitest']);
 
 // ---------------------------------------------------------------------------
-// Rule 4b - Float32 quarantine.
+// Rule 4b - JSON number quarantine.
 //
-// `@vaultbench/shared/float32` is a deliberate, documented concession to one
-// venue: the Enzyme API declares every numeric field as a 32-bit protobuf
-// float, so its numbers arrive already lossy and there is no keyless
-// alternative. The module's job is to get off the float at the boundary
-// without inventing the digits a double would add.
+// `@vaultbench/shared/wire-number` is a deliberate, documented concession to
+// one venue: Enzyme's Connect API sends money as bare JSON numbers rather than
+// decimal strings, so the value has been through a binary float before we can
+// touch it. The module's job is to get off the float at the boundary,
+// preserving the wire token exactly.
 //
-// Left unguarded, it is a general-purpose exemption from "no floating point in
-// the data path" that any future adapter could reach for instead of asking the
+// Left unguarded it is a general-purpose exemption from "no floating point in
+// the data path" that a future adapter could reach for instead of asking its
 // venue for a string. Only the adapter that is actually forced may import it.
 // ---------------------------------------------------------------------------
-const FLOAT32_MODULE = '@vaultbench/shared/float32';
-const FLOAT32_ALLOWED_PREFIX = 'sources/src/enzyme/';
+const WIRE_NUMBER_MODULE = '@vaultbench/shared/wire-number';
+const WIRE_NUMBER_ALLOWED_PREFIX = 'sources/src/enzyme/';
 const IO_GLOBALS = [
   [/\bfetch\s*\(/, 'fetch() is I/O; core takes data as arguments'],
   [/\bprocess\.env\b/, 'reading the environment is I/O; pass configuration in'],
@@ -183,15 +183,15 @@ for (const file of [...new Set(scanTargets)]) {
     }
   }
 
-  if (!isGuard && !relative.startsWith('shared/src/float32')) {
+  if (!isGuard && !relative.startsWith('shared/src/wire-number')) {
     for (const specifier of importSpecifiers(code)) {
-      if (specifier !== FLOAT32_MODULE) continue;
-      if (relative.startsWith(FLOAT32_ALLOWED_PREFIX)) continue;
+      if (specifier !== WIRE_NUMBER_MODULE) continue;
+      if (relative.startsWith(WIRE_NUMBER_ALLOWED_PREFIX)) continue;
       fail(
-        'float32-quarantine',
+        'json-number-quarantine',
         file,
-        `${FLOAT32_MODULE} is quarantined to ${FLOAT32_ALLOWED_PREFIX}; ` +
-          'parse the source as a decimal string instead of a float',
+        `${WIRE_NUMBER_MODULE} is quarantined to ${WIRE_NUMBER_ALLOWED_PREFIX}; ` +
+          'ask the venue for a decimal string instead of a JSON number',
       );
     }
   }
@@ -261,8 +261,15 @@ for (const required of ['AGENTS.md', 'docs/traps.md']) {
 }
 
 // ---------------------------------------------------------------------------
+/**
+ * Every rule name must appear here. The reporter below groups violations by
+ * this list, so a rule missing from it counts toward the failure total and
+ * then prints nothing — a check that fails without saying why, which is worse
+ * than no check because it looks like a bug in the harness.
+ */
 const RULE_ORDER = [
   'no-floating-point',
+  'json-number-quarantine',
   'no-hardcoded-secrets',
   'scoped-db-writes',
   'core-zero-io',
@@ -336,6 +343,18 @@ if (existsSync(EXAMPLE_ENV)) {
         );
       }
     });
+}
+
+// A rule that fires but is missing from RULE_ORDER would be counted and never
+// printed. Caught rather than trusted, because the symptom — a non-zero
+// failure count with no explanation under it — reads as a broken harness and
+// sends the next person looking in the wrong place.
+const unlisted = [...new Set(violations.map((violation) => violation.rule))].filter(
+  (rule) => !RULE_ORDER.includes(rule),
+);
+if (unlisted.length > 0) {
+  console.error(`harness: rule(s) missing from RULE_ORDER: ${unlisted.join(', ')}`);
+  process.exit(2);
 }
 
 if (violations.length === 0) {

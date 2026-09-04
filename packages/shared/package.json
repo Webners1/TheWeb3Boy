@@ -12,9 +12,9 @@
       "types": "./src/decimal.ts",
       "default": "./src/decimal.ts"
     },
-    "./float32": {
-      "types": "./src/float32.ts",
-      "default": "./src/float32.ts"
+    "./wire-number": {
+      "types": "./src/wire-number.ts",
+      "default": "./src/wire-number.ts"
     }
   },
   "scripts": {

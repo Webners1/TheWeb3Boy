@@ -1,8 +1,8 @@
-﻿# VaultBench â€” Known Data Traps
+# VaultBench — Known Data Traps
 
 These traps have already been identified. Read this file before writing an
 adapter, a backfill, or any analytical query. When a new trap is discovered,
-add it here â€” that is the whole point of the harness.
+add it here — that is the whole point of the harness.
 
 ## 1. Downsampling Trap
 
@@ -15,7 +15,7 @@ across a vault's entire life), not a daily series. Mark it
 - Only points sourced from a same-day `day` bucket read may be written with
   `sampling='daily'`.
 - Never publish a metric computed on a downsampled series without labeling
-  its sampling resolution â€” e.g. a drawdown from a ~biweekly series
+  its sampling resolution — e.g. a drawdown from a ~biweekly series
   understates true max drawdown.
 
 ## 2. Cumulative PnL
@@ -24,7 +24,7 @@ across a vault's entire life), not a daily series. Mark it
 difference it.
 
 - Store the reported value verbatim in `entity_snapshots.cum_pnl`.
-- Periodic PnL must come from buckets that report it per period â€” never from
+- Periodic PnL must come from buckets that report it per period — never from
   differencing cumulative points, which on a downsampled series (trap 1)
   span irregular, unknown intervals anyway.
 
@@ -56,7 +56,7 @@ datasets. Assert row counts against yesterday's count.
 ## 5. Parent/child linkage is inverted
 
 Hyperliquid `child` records are `{ type: "child" }` with no parent address.
-The parent record lists `data.childAddresses`. Build the map from parent â†’
+The parent record lists `data.childAddresses`. Build the map from parent →
 children, then set `parent_entity_id` on the children. Never sum TVL across
 a parent and its children.
 
@@ -75,13 +75,13 @@ epoch 0.
 `netFlow[t] = (accountValue[t] - accountValue[t-1]) - (cumPnl[t] - cumPnl[t-1])`.
 Everything downstream depends on this one line being right.
 
-- Chain-link sub-period returns: `r[t] = Î”PnL[t] / (accountValue[t-1] + 0.5 Ã— netFlow[t])`.
+- Chain-link sub-period returns: `r[t] = ΔPnL[t] / (accountValue[t-1] + 0.5 × netFlow[t])`.
 - The 0.5 weight is Modified Dietz. A daily snapshot does not reveal when
   inside the day a deposit landed, so mid-period is the honest assumption.
   `entity_nav.method` records `simple` when there was no flow and the return
   is exact, `dietz` when it was estimated.
 - If the denominator is zero or negative the period is not computable. The
-  chain truncates rather than bridging â€” bridging invents a return nobody
+  chain truncates rather than bridging — bridging invents a return nobody
   earned.
 
 ## 9. A total wipeout is a real -100%, but it cannot compound
@@ -103,7 +103,7 @@ place that decides it.
 `packages/compute/src/fees.ts` treats Hyperliquid as `gross` and applies the
 recorded `leaderCommission` to the gain. If that is backwards we are
 *understating* vault returns, which for a benchmark product is the safe
-direction to be wrong in â€” but it is unverified. Confirm against a vault where
+direction to be wrong in — but it is unverified. Confirm against a vault where
 the leader's realised commission can be observed independently, then update
 `FEE_BASIS` and delete this entry.
 
@@ -113,7 +113,7 @@ On `tokenPriceHistory`, the field named `adjustedTokenPrice` is **cumulative
 return since inception**, as a fraction. Per-unit value is `1 + value`.
 
 How this was caught: real responses contain negative values (observed down to
-`-0.55`), and a share price cannot be negative. Confirmed on two vaults â€”
+`-0.55`), and a share price cannot be negative. Confirmed on two vaults —
 `1 + lastValue` reconciles with `Fund.tokenPrice` in both cases.
 
 - The first point of an `all` series is exactly `"0"`, meaning an index of 1,
@@ -154,16 +154,16 @@ Two consequences, both implemented:
 
 1. The adapter runs at **0.75 req/s** (45/min). A 221-vault chain takes about
    five minutes, which beats a run that dies halfway and writes nothing.
-2. Exponential backoff is the wrong shape for a windowed quota. A 500msâ†’16s
+2. Exponential backoff is the wrong shape for a windowed quota. A 500ms→16s
    ramp burns all five retries inside the hot window and fails. `fetchJson`
-   now waits out the window on a 429 â€” `Retry-After` when the server sends
+   now waits out the window on a 429 — `Retry-After` when the server sends
    one, otherwise a 65s floor.
 
 ## 15. A TVL floor at discovery invents deaths
 
 Polygon alone returns ~1,579 Chamber vaults, most of them dust, and the
 temptation is to filter by TVL at ingestion. Do not. A vault that shrinks
-below the floor would vanish from the universe and be marked `delisted` â€”
+below the floor would vanish from the universe and be marked `delisted` —
 a death that never happened, in the one table whose whole purpose is an
 honest survivorship record. Filter for presentation, never for ingestion.
 
@@ -184,7 +184,7 @@ credentials, no account:
 buf export buf.build/avantgardefinance/enzyme -o <dir>
 ```
 
-That returns the complete `.proto` set â€” every message, field, type and enum
+That returns the complete `.proto` set — every message, field, type and enum
 the API can return. The key gates the *data*, not the contract. The lesson
 generalises past Enzyme: before recording a shape as unknowable, check whether
 the vendor publishes a machine-readable schema somewhere other than the
@@ -195,7 +195,7 @@ What the export established:
 
 - Endpoint `POST https://api.enzyme.finance/enzyme.enzyme.v1.EnzymeService/<Method>`,
   headers `authorization: Bearer <key>` and `connect-protocol-version: 1`.
-  This is Connect-over-HTTP, so standard `fetch` is enough â€” no gRPC client
+  This is Connect-over-HTTP, so standard `fetch` is enough — no gRPC client
   and no new dependency.
 - Relevant methods: `GetVaultList`, `GetVault`, `GetVaultTimeSeries`,
   `GetVaultDepositors`, `GetVaultConfiguration`.
@@ -212,18 +212,39 @@ made visible, none of which would have been guessed:
 - **`net_share_value` is named net by the vendor**, which is why
   `FEE_BASIS.enzyme` is `net`. Applying our own haircut would double-count.
 
-What the schema still cannot tell you is semantics â€” Chamber's
-`adjustedTokenPrice` was a perfectly plausible name for something entirely
-different (trap 12). So the shape is verified and the *meaning* of
-`net_share_value` is still taken on the vendor's word until a live response
-can be reconciled against Enzyme's own UI. That reconciliation is the one
-remaining Enzyme task, and it needs a key.
+What a schema cannot tell you is semantics — Chamber's `adjustedTokenPrice`
+was a perfectly plausible name for something entirely different (trap 12). So
+`net_share_value` needed reconciling against something independent before it
+could be trusted.
+
+**It reconciles, and no external source was needed**, because three of
+Enzyme's own fields cross-check. For vault `0x27f23c7` on Ethereum:
+
+```
+grossAssetValue / numberOfShares = 2248.5609   (gross, per share)
+netShareValue                    = 2247.9694   (net, per share)
+```
+
+Net sits 0.026% *below* gross-per-share, which is accrued but unsettled fees.
+That single comparison establishes all three things in doubt: the field is
+per-share rather than a total, it is net rather than gross, and its units
+match `grossAssetValue`. Any mis-scaling — wei, basis points, a total
+mistaken for a per-unit — would throw the ratio out by orders of magnitude
+rather than by three basis points. The check is kept as a test in
+`packages/sources/src/enzyme/adapter.test.ts`, since it is what a scaling
+regression would fail first.
+
+Live figures for the record: 1738 vaults on Ethereum, of which 730 have a
+priced share. The other 1008 have no share price at all — 645 with a valid
+flag and a zero price, 363 with neither. Not one vault has a price the
+validity flag rejects, and not one rejected vault holds over $1,000, so
+dropping them loses nothing real.
 
 ## 17. Annualising an irregular series
 
 Volatility is annualised by the *observed* mean step length, not an assumed
 daily cadence. Scaling a ~biweekly Hyperliquid backfill as if it were daily
-overstates volatility by roughly âˆš14. `volatility()` returns `meanStepDays`
+overstates volatility by roughly √14. `volatility()` returns `meanStepDays`
 so the caveat can be stated rather than hidden.
 
 
@@ -235,7 +256,7 @@ The obvious test for "is this really a 90-day return?" is
 On a series sampled every two days, whether an observation lands exactly on
 the window cutoff is a parity coin-flip against the window length. A
 three-year-old Chamber vault therefore reported `is_full_window: false` for
-90 days while reporting `true` for 365 â€” non-monotonic, and it made the one
+90 days while reporting `true` for 365 — non-monotonic, and it made the one
 field a reader checks before trusting a figure answer a different question
 from the one they were asking. The tell was aggregate: a shorter window
 showing *fewer* full-window entities than a longer one is arithmetically
@@ -247,52 +268,79 @@ are actually the ways a window fails to be full:
 1. Did the record begin at or before the window opened? If not, the entity
    is younger than the window and this is not a 90-day return at all.
 2. Does the record still run to the window's end, within one sampling step?
-   If not, the figure is stale â€” a vault that stopped reporting two months
+   If not, the figure is stale — a vault that stopped reporting two months
    ago must not present its last reading as current.
 
 Sparse sampling *inside* a full window is not an incompleteness; it is
 disclosed by `days_covered` and `sampling`. Keep the three fields answering
 three different questions.
 
-Note that `sampling` is a provenance label â€” which endpoint the rows came
-from â€” not a measurement of spacing. A series tagged `daily` can still have
+Note that `sampling` is a provenance label — which endpoint the rows came
+from — not a measurement of spacing. A series tagged `daily` can still have
 gaps. `days_covered` is the field that catches that.
-## 19. A source can hand you a float, and the damage is on the way in
+## 19. A schema constrains the shape, never the precision
 
-Enzyme's protobuf declares `net_share_value`, `gross_asset_value` and every
-fee `rate` as `float` â€” IEEE-754 single precision, about 7.2 significant
-decimal digits. The numbers are lossy before we ever see them. That is a fact
-about the venue; there is no keyless alternative and no stringly-typed
-variant to ask for.
+Enzyme sends money as bare JSON numbers rather than decimal strings, so every
+value has been through a binary float before we can touch it. That much is
+unavoidable. The instructive part is what came next, because **this trap was
+written backwards the first time.**
 
-The trap is not the lost precision. **It is the precision that gets invented
-on the way in.** JavaScript parses a JSON number into a double, and the
-float32 nearest 1.05 printed as a double is `1.0499999523162842`. Store that
-in a `numeric` column and the database now asserts sixteen significant digits
-about a number that was only ever good for seven. Nine of those digits are
-noise, and they will render looking exactly like precision.
+Enzyme's published protobuf declares `net_share_value`, `gross_asset_value`
+and every fee `rate` as `float` — 32-bit, about 7.2 significant decimal
+digits. Reading that, the obvious conclusion was that values arrive lossy and
+the danger is *invented* precision: JavaScript widens a float32 to a double,
+and the float32 nearest 1.05 prints as `1.0499999523162842`, so storing that
+asserts sixteen significant digits about a seven-digit source. The first
+implementation therefore snapped every value to the nearest float32 and
+returned the shortest string that round-tripped to it.
 
-`float32DecimalString` in `packages/shared/src/float32.ts` returns the
-shortest decimal string that round-trips to the same float32 â€” `"1.05"`, not
-`"1.0499999523162842"` and not `"1.05000000"`. That is the same shortest
-round-trip rule Go's `protojson` uses to serialise a float32, so in practice
-it reconstructs the exact token the server sent.
+The live API demolished that. Not one observed value is float32-representable:
 
-Two consequences worth keeping:
+| field | wire value | nearest float32 |
+| --- | --- | --- |
+| `netShareValue` | `1688.2824302978102` | `1688.282470703125` |
+| `netShareValue` | `1724.2856506965004` | `1724.28564453125` |
+| `sharePrice` | `2246.9706589468947` | `2246.970703125` |
 
+The JSON gateway emits full doubles. The `float` in the schema describes the
+gRPC *binary* encoding and says nothing about what the JSON transport
+delivers. The float32 treatment would have published `"1688.2825"` for the
+first row — destroying nine digits of real data, in the name of precision
+hygiene.
+
+The rule is therefore **preserve, not round**, because both directions lie:
+
+- *Adding* digits: widening a genuinely low-precision value and keeping the
+  noise tail, which then renders as precision.
+- *Dropping* digits: rounding to a precision the venue never claimed,
+  silently discarding real information.
+
+`wireNumberDecimalString` in `packages/shared/src/wire-number.ts` reproduces
+the wire token exactly. JavaScript's `Number`-to-string is already the
+shortest decimal that round-trips to the same double, which is what a Go
+server produces when serialising one, so the function is one line plus the
+expansion of exponential notation that `numeric` requires.
+
+Three consequences worth keeping:
+
+- **Verify precision against a live response, never against a schema.** A
+  schema is authoritative about field names and nullability and worthless
+  about how many digits actually arrive. This was caught only because a key
+  turned up; a fixture generated from the proto would have agreed with the
+  wrong implementation forever.
 - The module is quarantined to `packages/sources/src/enzyme/` by the
-  `float32-quarantine` harness rule. It is a concession to one venue that
-  forces it, not a general exemption from the no-floating-point rule. A future
-  adapter reaching for it should be asking its venue for a string instead.
+  `json-number-quarantine` harness rule. It is a concession to the one venue
+  that sends numbers instead of strings, not a general exemption from the
+  no-floating-point rule. A future adapter reaching for it should be asking
+  its venue for a string.
 - A non-finite value throws rather than coercing to zero. A venue sending
   `NaN` is reporting a broken figure, and turning that into `0` converts "we
-  don't know" into "it is worthless", which then compounds through a return
-  series.
+  don't know" into "it is worthless", which compounds through a return series.
 
 ## 20. Connect JSON omits zero values, and the default direction matters
 
 Enzyme speaks Connect, whose JSON encoding drops zero-valued fields by
-default. An absent number means `0` and an absent boolean means `false` â€” not
+default. An absent number means `0` and an absent boolean means `false` — not
 "missing".
 
 For `price_is_valid` the direction of that default is load-bearing. A schema
@@ -396,3 +444,38 @@ made. `no-hardcoded-secrets` was listed as `automated` in AGENTS.md and had
 been since the first commit. It was automated over the wrong file set, and
 nothing in the proof table could reveal that, because the table records
 whether a check exists and not what it looks at.
+
+## 23. Do not round-trip a UTF-8 file through PowerShell
+
+Self-inflicted, during this build, and it corrupted a file that had been
+correct for weeks.
+
+Reordering sections in `docs/traps.md` was done with
+`Get-Content | Set-Content -Encoding utf8`. On PowerShell 5.1 that is two
+bugs in one pipeline:
+
+- `Get-Content` decodes using the system ANSI code page, not UTF-8. Every
+  multi-byte character comes back as its individual bytes reinterpreted as
+  cp1252 characters.
+- `Set-Content -Encoding utf8` then re-encodes those, and prepends a BOM.
+
+The result is the classic double-encoding. An em-dash (U+2014, bytes
+`E2 80 94`) became the three characters `â€`+U+201D and stayed that way in
+the committed file. It hit 19 em-dashes plus a `Δ`, a `×`, a `√` and two
+arrows in prose that predated the edit, so the damage was not limited to the
+lines being changed.
+
+It was caught only because a later edit failed to match its own anchor text,
+and the mismatch showed the mojibake. A silent prose corruption has no test to
+fail, and `git diff` looked plausible because the whole file was rewritten
+anyway.
+
+The rule: **edit files with tools that are UTF-8 by default.** Use the editor,
+or Node's `readFileSync`/`writeFileSync` with an explicit `'utf8'`.
+Never `Get-Content`/`Set-Content`/`Out-File` for content that may hold a
+character above U+007F, and never for content that will be committed.
+
+If it happens again, the repair is to map each character of a non-ASCII run
+back to its cp1252 byte and decode the result as UTF-8, accepting only runs
+that decode without a replacement character. Bytes `0x80`-`0x9F` need a
+reverse cp1252 table; everything else maps to itself.

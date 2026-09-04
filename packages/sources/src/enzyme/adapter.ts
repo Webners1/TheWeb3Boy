@@ -72,11 +72,12 @@ export interface EnzymeSourceOptions extends AdapterHooks {
  *
  * Two properties of the venue are worth knowing before reading further:
  *
- * - **Every number is a 32-bit float.** Enzyme's published protobuf schema
- *   declares `net_share_value`, `gross_asset_value` and every fee rate as
- *   `float`. The values are lossy before we ever see them. Handling is in
- *   `./schemas.ts`; the point is that we carry the source's real precision
- *   forward and never widen it into invented digits.
+ * - **Money arrives as bare JSON numbers**, not decimal strings, so it has
+ *   been through a binary float before we can touch it. The schema calls
+ *   these fields `float` but the JSON gateway emits full doubles — a live
+ *   `netShareValue` is `1688.2824302978102`, which no float32 can hold.
+ *   Handling is in `./schemas.ts`: preserve the wire token exactly, adding no
+ *   digits and dropping none.
  *
  * - **Enzyme tells you when its own price is wrong.** `price_is_valid` /
  *   `share_price_valid` go false when the vault's holdings could not be

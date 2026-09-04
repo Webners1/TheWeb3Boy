@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { float32DecimalString } from '@vaultbench/shared/float32';
+import { wireNumberDecimalString } from '@vaultbench/shared/wire-number';
 import { hexAddress } from '@vaultbench/shared';
 
 /**
@@ -18,24 +18,27 @@ import { hexAddress } from '@vaultbench/shared';
  */
 
 /**
- * 1. Every numeric field in the Enzyme schema is a protobuf `float`: 32-bit,
- *    roughly 7.2 significant decimal digits. Share prices, asset values and
- *    fee rates all arrive that way, already lossy.
+ * 1. Money arrives as bare JSON numbers, not decimal strings, so every value
+ *    has been through a binary float before we can touch it.
  *
- *    Parsing one straight into a `Decimal` through JavaScript's double would
- *    append about nine digits of noise — the float32 nearest 1.05 prints as
- *    1.0499999523162842 — and a `numeric` column would then assert precision
- *    the venue never had. `float32DecimalString` returns the shortest string
- *    that round-trips to the same float32, carrying the source's real
- *    precision and not one digit more. See its module doc and docs/traps.md.
+ *    The schema declares these fields `float` (32-bit), and taking that at
+ *    face value was a mistake: a live `netShareValue` is
+ *    `1688.2824302978102`, which is not float32-representable at all — the
+ *    nearest float32 is `1688.282470703125`. Rounding to float32 precision, as
+ *    an earlier version of this file did, would have published `"1688.2825"`
+ *    and thrown away nine real digits. The `float` describes the gRPC binary
+ *    encoding, not what the JSON gateway emits.
+ *
+ *    `wireNumberDecimalString` preserves the wire token exactly — no digits
+ *    added, none dropped. See its module doc and trap 19.
  */
-const float32Decimal = z.number().transform((value, ctx) => {
+const wireDecimal = z.number().transform((value, ctx) => {
   try {
-    return float32DecimalString(value);
+    return wireNumberDecimalString(value);
   } catch (error) {
     ctx.addIssue({
       code: 'custom',
-      message: error instanceof Error ? error.message : 'unreadable float32',
+      message: error instanceof Error ? error.message : 'unreadable wire number',
     });
     return z.NEVER;
   }
@@ -49,7 +52,7 @@ const float32Decimal = z.number().transform((value, ctx) => {
  *    must read as `false`, because treating an unspoken validity flag as
  *    `true` waves through exactly the prices Enzyme is warning us about.
  */
-const maybeFloat32 = float32Decimal.nullish();
+const maybeDecimal = wireDecimal.nullish();
 
 /**
  * 3. `google.protobuf.Timestamp` is an RFC 3339 string in Connect JSON
@@ -99,10 +102,10 @@ export const enzymeTimeSeriesItemSchema = z.object({
    * `navQuality: 'reported'` where OKX, which publishes only account value
    * and PnL, cannot.
    */
-  netShareValue: maybeFloat32,
+  netShareValue: maybeDecimal,
   /** Total value of assets held, before fees. Not per-unit. */
-  grossAssetValue: maybeFloat32,
-  numberOfShares: maybeFloat32,
+  grossAssetValue: maybeDecimal,
+  numberOfShares: maybeDecimal,
   /**
    * Enzyme's own admission that it could not price the vault's holdings at
    * this timestamp — a stale or missing oracle feed, usually. The share value
@@ -121,12 +124,12 @@ export const enzymeTimeSeriesResponseSchema = connectJson(
 export const enzymeVaultListItemSchema = z.object({
   address: hexAddress,
   inception: protoTimestamp.nullish(),
-  sharePrice: maybeFloat32,
+  sharePrice: maybeDecimal,
   /** Same warning as `priceIsValid`, applied to the current price. */
   sharePriceValid: z.boolean().nullish(),
-  grossAssetValue: maybeFloat32,
-  numberOfShares: maybeFloat32,
-  numberOfDepositors: maybeFloat32,
+  grossAssetValue: maybeDecimal,
+  numberOfShares: maybeDecimal,
+  numberOfDepositors: maybeDecimal,
 });
 
 export const enzymeVaultListResponseSchema = connectJson(
@@ -145,10 +148,10 @@ export const enzymeVaultResponseSchema = connectJson(
     owner: z.string().nullish(),
     inception: protoTimestamp.nullish(),
     denomination: z.string().nullish(),
-    sharePrice: maybeFloat32,
-    netAssetValue: maybeFloat32,
-    grossAssetValue: maybeFloat32,
-    numberOfShares: maybeFloat32,
+    sharePrice: maybeDecimal,
+    netAssetValue: maybeDecimal,
+    grossAssetValue: maybeDecimal,
+    numberOfShares: maybeDecimal,
   }),
 );
 

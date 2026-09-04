@@ -48,7 +48,12 @@ describe('EnzymeSource', () => {
     // The failure mode this guards against is quiet: no key, no vaults, an
     // ingest run that looks like a success and silently marks the whole
     // Enzyme universe as having gone away.
-    const { instance } = source({}, { apiKey: undefined });
+    //
+    // An empty string, not `undefined`: the constructor falls back to
+    // process.env.ENZYME_API_KEY, and Vitest loads .env into the
+    // environment, so `undefined` made this test pass or fail depending on
+    // whether the developer happened to have a key configured.
+    const { instance } = source({}, { apiKey: '' });
     await expect(instance.listEntities()).rejects.toThrow(/ENZYME_API_KEY is not set/);
   });
 
@@ -67,29 +72,87 @@ describe('EnzymeSource', () => {
     expect(calls[0]?.body).toMatchObject({ currency: 'CURRENCY_USD' });
   });
 
-  it('reads a share price at the source precision, not the double that JSON gives', async () => {
-    // 1.05 as a float32 widens to 1.0499999523162842 as a double. Storing
-    // that would assert sixteen significant digits about a seven-digit
-    // source, and the tail would render as precision.
+  it('preserves every digit the wire carried, dropping none', async () => {
+    // These are real values from a live GetVaultList. Seventeen significant
+    // digits, and none of them ours to discard: the schema declares these
+    // fields float32, but 2246.9706589468947 is not float32-representable,
+    // and rounding to float32 would publish "2246.9707".
     const { instance } = source({
       GetVaultList: vaultListResponse([
         {
           address: VAULT,
-          inception: '2024-01-01T00:00:00Z',
-          sharePrice: Math.fround(1.05),
+          inception: '2022-05-27T11:41:13Z',
+          sharePrice: 2246.9706589468947,
           sharePriceValid: true,
-          grossAssetValue: Math.fround(1234567.5),
+          grossAssetValue: 34496359.03177008,
         },
       ]),
     });
 
     const snapshots = await instance.snapshot(new Date('2026-03-01T00:00:00Z'));
     expect(snapshots).toHaveLength(1);
-    expect(snapshots[0]?.valuePerUnit?.toFixed()).toBe('1.05');
-    expect(snapshots[0]?.aumUsd?.toFixed()).toBe('1234567.5');
+    expect(snapshots[0]?.valuePerUnit?.toFixed()).toBe('2246.9706589468947');
+    expect(snapshots[0]?.aumUsd?.toFixed()).toBe('34496359.03177008');
     // A genuine per-share NAV, net of fees — so it is rankable.
     expect(snapshots[0]?.navQuality).toBe('reported');
     expect(snapshots[0]?.sampling).toBe('daily');
+  });
+
+  it('reconciles net share value against gross per share, the way live data does', async () => {
+    /**
+     * The semantic check that closed the last open Enzyme question, and the
+     * one a scaling regression would fail first.
+     *
+     * A schema proves field names, never meaning — Chamber's
+     * `adjustedTokenPrice` was a plausible name for something else entirely
+     * (trap 12). Enzyme needs no external source to settle it, because three
+     * of its own fields cross-check:
+     *
+     *   grossAssetValue / numberOfShares = 2248.5609  (gross, per share)
+     *   netShareValue                    = 2247.9694  (net, per share)
+     *
+     * Net sits 0.026% *below* gross-per-share, which is accrued but unsettled
+     * fees. That single comparison establishes all three things we needed:
+     * the field is per-share rather than a total, it is net rather than
+     * gross, and the units match `grossAssetValue`. Values are live, from
+     * vault 0x27f23c7 on Ethereum.
+     *
+     * Any mis-scaling — wei, basis points, a total mistaken for a per-unit —
+     * would throw this ratio out by orders of magnitude rather than by 3bp.
+     */
+    const { instance } = source({
+      GetVaultList: vaultListResponse([
+        {
+          address: VAULT,
+          sharePrice: 2247.969400150854,
+          sharePriceValid: true,
+          grossAssetValue: 34511692.091422826,
+          numberOfShares: 15348.346314223398,
+        },
+      ]),
+    });
+
+    const snapshots = await instance.snapshot(new Date('2026-09-04T00:00:00Z'));
+    const netPerShare = snapshots[0]?.valuePerUnit;
+    const grossPerShare = snapshots[0]?.aumUsd?.div('15348.346314223398');
+    if (netPerShare === undefined || grossPerShare === undefined) throw new Error('no snapshot');
+
+    // Net below gross: fees accrue against the share price, never in favour.
+    expect(netPerShare.lt(grossPerShare)).toBe(true);
+    // ...and only slightly below. A unit error would not be within 1%.
+    expect(grossPerShare.minus(netPerShare).div(grossPerShare).lt('0.01')).toBe(true);
+  });
+
+  it('adds no digits to a value that had few', async () => {
+    const { instance } = source({
+      GetVaultList: vaultListResponse([
+        { address: VAULT, sharePrice: 1.05, sharePriceValid: true, grossAssetValue: 500 },
+      ]),
+    });
+
+    const snapshots = await instance.snapshot(new Date('2026-03-01T00:00:00Z'));
+    expect(snapshots[0]?.valuePerUnit?.toFixed()).toBe('1.05');
+    expect(snapshots[0]?.aumUsd?.toFixed()).toBe('500');
   });
 
   it("drops a price Enzyme itself flags as invalid", async () => {
@@ -134,9 +197,9 @@ describe('EnzymeSource', () => {
         vaults: [
           {
             address: VAULT,
-            share_price: Math.fround(3.25),
+            share_price: 3.25,
             share_price_valid: true,
-            gross_asset_value: Math.fround(500),
+            gross_asset_value: 500,
           },
         ],
       },
@@ -161,24 +224,24 @@ describe('EnzymeSource', () => {
         items: [
           {
             timestamp: '2025-06-15T00:00:00Z',
-            netShareValue: Math.fround(1),
-            grossAssetValue: Math.fround(1000),
+            netShareValue: 1,
+            grossAssetValue: 1000,
             priceIsValid: true,
           },
           {
             timestamp: '2025-06-16T00:00:00Z',
-            netShareValue: Math.fround(1.02),
+            netShareValue: 1.02,
             priceIsValid: true,
           },
           // Enzyme could not price the holdings here.
           {
             timestamp: '2025-06-17T00:00:00Z',
-            netShareValue: Math.fround(99),
+            netShareValue: 99,
             priceIsValid: false,
           },
           {
             timestamp: '2025-06-18T00:00:00Z',
-            netShareValue: Math.fround(1.04),
+            netShareValue: 1.04,
             priceIsValid: true,
           },
         ],
@@ -222,7 +285,7 @@ describe('EnzymeSource', () => {
         GetVaultTimeSeries: {
           items: [
             { timestamp: '2025-06-16T00:00:00Z', netShareValue: 1, priceIsValid: true },
-            { timestamp: '2025-06-16T23:00:00Z', netShareValue: Math.fround(1.5), priceIsValid: true },
+            { timestamp: '2025-06-16T23:00:00Z', netShareValue: 1.5, priceIsValid: true },
           ],
         },
       });
