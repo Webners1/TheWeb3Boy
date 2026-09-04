@@ -95,19 +95,22 @@ function initTextScramble(): () => void {
 
   const wordFx = new TextScramble(wordEl);
   const subFx = new TextScramble(subEl);
-  let counter = 0;
+  // Start at index 1: index 0 is already on screen as the static initial
+  // markup, so the very first scramble should visibly change something
+  // instead of re-scrambling the same word back onto itself.
+  let counter = 1;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let paused = false;
   let stopped = false;
 
   function next() {
     if (stopped) return;
-    const pair = pairs[counter];
+    const pair = pairs[counter % pairs.length];
     wordFx.setText(pair.word);
     subFx.setText(pair.sub).then(() => {
       if (!stopped) timeoutId = setTimeout(next, 2800);
     });
-    counter = (counter + 1) % pairs.length;
+    counter += 1;
   }
 
   const io = new IntersectionObserver(
@@ -124,7 +127,7 @@ function initTextScramble(): () => void {
   );
   io.observe(wordEl);
 
-  const startTimeout = setTimeout(next, 1800);
+  const startTimeout = setTimeout(next, 900);
 
   return () => {
     stopped = true;
@@ -283,12 +286,12 @@ function initHeroShader(): () => void {
       float dist = length(delta);
       vec2 dir = delta / (dist + 1e-4);
 
-      float lensRadius = 0.15;
-      float inLens = smoothstep(lensRadius, lensRadius * 0.82, dist) * u_magnifyAmount;
-      float zoom = 1.0 + (1.5 + 1.2 * u_hotspotBoost) * u_magnifyAmount;
+      float lensRadius = 0.11;
+      float inLens = smoothstep(lensRadius, lensRadius * 0.94, dist) * u_magnifyAmount;
+      float zoom = 1.0 + (0.55 + 0.35 * u_hotspotBoost) * u_magnifyAmount;
       vec2 lensUv = mouseUv + (uv - mouseUv) / zoom;
       uv = mix(uv, lensUv, inLens);
-      float rim = smoothstep(0.05, 0.0, abs(dist - lensRadius)) * u_magnifyAmount * 0.5;
+      float rim = smoothstep(0.016, 0.0, abs(dist - lensRadius)) * u_magnifyAmount * 0.9;
 
       float strength = smoothstep(0.4, 0.0, dist) * (1.0 - inLens);
       float ripple = sin(dist * 34.0 - u_time * 3.2) * 0.018 * strength;
@@ -386,7 +389,7 @@ function initHeroShader(): () => void {
     if (scrimEl) {
       scrimEl.style.setProperty("--lens-x", `${mouseCurrent[0] * 100}%`);
       scrimEl.style.setProperty("--lens-y", `${(1 - mouseCurrent[1]) * 100}%`);
-      const radius = magnifyAmount * (hotspotBoost > 0.5 ? 230 : 190);
+      const radius = magnifyAmount * (hotspotBoost > 0.5 ? 155 : 130);
       scrimEl.style.setProperty("--lens-r", `${radius}px`);
     }
     renderer.render(scene, camera);
