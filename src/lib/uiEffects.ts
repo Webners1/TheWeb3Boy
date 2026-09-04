@@ -1,21 +1,3 @@
-export function initTicker(): () => void {
-  const track = document.getElementById("tickerTrack");
-  if (!track) return () => {};
-  const items = [
-    "$ role: web3 builder, ai engineer, content creator",
-    "$ product: youvsbtc, in development",
-    "$ benchmark: btc, eth, sol",
-    "$ experience: 6y web3, 2y ai, 40+ dapps shipped",
-    "$ status: shipping, not hyping",
-    "$ no ai slop detected",
-  ];
-  const html = items.map((t) => `<span>${t}</span>`).join("");
-  track.innerHTML = html + html;
-  return () => {
-    track.innerHTML = "";
-  };
-}
-
 export function initContactMenu(): () => void {
   const btn = document.getElementById("contactBtn");
   const menu = document.getElementById("contactMenu");

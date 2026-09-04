@@ -5,11 +5,11 @@ import Link from "next/link";
 import HeroSpotlight from "@/components/HeroSpotlight";
 import { initHeroEffects } from "@/lib/heroEffects";
 import { initDuelChart } from "@/lib/duelChart";
-import { initTicker, initContactMenu, initBlockCounter } from "@/lib/uiEffects";
+import { initContactMenu, initBlockCounter } from "@/lib/uiEffects";
 
 export default function Home() {
   useEffect(() => {
-    const cleanups = [initTicker(), initContactMenu(), initBlockCounter(), initHeroEffects(), initDuelChart()];
+    const cleanups = [initContactMenu(), initBlockCounter(), initHeroEffects(), initDuelChart()];
     return () => cleanups.forEach((fn) => fn());
   }, []);
 
@@ -135,9 +135,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-        <div className="ticker" aria-hidden="true">
-          <div className="ticker-track" id="tickerTrack" />
         </div>
       </section>
 
