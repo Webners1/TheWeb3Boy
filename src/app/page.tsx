@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import Nav from "@/components/Nav";
 import HeroSpotlight from "@/components/HeroSpotlight";
 import { initHeroEffects } from "@/lib/heroEffects";
 import { initDuelChart } from "@/lib/duelChart";
@@ -17,66 +18,7 @@ export default function Home() {
     <>
       <div className="grain" aria-hidden="true" />
 
-      <header className="nav">
-        <Link href="/" className="brand">
-          <span className="pulse-dot" />
-          theweb3boy
-        </Link>
-        <ul className="nav-links">
-          <li className="nav-dropdown">
-            <a href="#tools">Tools</a>
-            <div className="nav-dropdown-menu">
-              <Link href="/dashboard" className="nav-dropdown-item">
-                <span className="ndi-name">youVsBTC</span>
-                <span className="ndi-status">In development</span>
-              </Link>
-              <p className="nav-dropdown-note">More tools ship here as they&apos;re ready.</p>
-            </div>
-          </li>
-          <li>
-            <a href="#about">About</a>
-          </li>
-          <li>
-            <a href="#connect">Connect</a>
-          </li>
-        </ul>
-        <div className="nav-right">
-          <a className="icon-link" href="https://x.com/TheWeb3B0Y" target="_blank" rel="noopener" aria-label="X">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
-              <line x1="4" y1="4" x2="20" y2="20" />
-              <line x1="20" y1="4" x2="4" y2="20" />
-            </svg>
-          </a>
-          <a
-            className="icon-link"
-            href="https://www.linkedin.com/in/muzammilsiddiqui001/"
-            target="_blank"
-            rel="noopener"
-            aria-label="LinkedIn"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <line x1="7.5" y1="10.5" x2="7.5" y2="16.5" />
-              <circle cx="7.5" cy="7" r="0.6" fill="currentColor" stroke="none" />
-              <path d="M11.5 16.5v-4c0-1.4 1-2.2 2.2-2.2 1.2 0 2 .8 2 2.2v4" />
-              <line x1="11.5" y1="10.5" x2="11.5" y2="16.5" />
-            </svg>
-          </a>
-          <a
-            className="icon-link"
-            href="https://www.instagram.com/theweb3boy/"
-            target="_blank"
-            rel="noopener"
-            aria-label="Instagram"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="3" y="3" width="18" height="18" rx="5" />
-              <circle cx="12" cy="12" r="4" />
-              <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
-            </svg>
-          </a>
-        </div>
-      </header>
+      <Nav />
 
       <section id="hero">
         <div className="absolute inset-0">
