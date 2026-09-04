@@ -16,6 +16,8 @@
     "ingest": "pnpm --filter @vaultbench/ingest start --",
     "backfill": "pnpm --filter @vaultbench/backfill start --",
     "recompute": "pnpm --filter @vaultbench/compute run recompute --",
+    "api": "pnpm --filter @vaultbench/api run start",
+    "openapi": "pnpm --filter @vaultbench/api run openapi",
     "db:generate": "pnpm --filter @vaultbench/db run generate"
   },
   "devDependencies": {

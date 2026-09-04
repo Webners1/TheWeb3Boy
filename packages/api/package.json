@@ -1,0 +1,36 @@
+{
+  "name": "@vaultbench/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "start": "tsx src/run.ts",
+    "openapi": "tsx src/emit-openapi.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.9",
+    "@hono/zod-openapi": "^1.1.4",
+    "@vaultbench/core": "workspace:*",
+    "@vaultbench/db": "workspace:*",
+    "@vaultbench/shared": "workspace:*",
+    "decimal.js": "^10.6.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.10.7",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  }
+}

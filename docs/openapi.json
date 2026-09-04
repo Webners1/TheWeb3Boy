@@ -1,0 +1,1160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VaultBench API",
+    "version": "0.1.0",
+    "description": "Crypto vault and copy-trading performance measured against BTC/ETH/SOL buy-and-hold, on a time-weighted basis with flows removed.\n\nTwo rules govern every response:\n\n1. **Money is a string.** Returns, ratios and money values are exact decimal strings. A JSON number is a float and would reintroduce the error the database's numeric columns exist to avoid.\n2. **Coverage travels with every figure.** Every metrics object carries `coverage` with `daysCovered`, `isFullWindow`, `sampling`, `navQuality` and `headlineEligible`. A 90-day return built from 4 days of downsampled data is reported as such rather than presented as a 90-day return.\n\nClosed and delisted entities are served by default. Excluding them is what makes a leaderboard flattering and wrong."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8787"
+    }
+  ],
+  "tags": [
+    {
+      "name": "entities",
+      "description": "Vaults and copy-trading leaders."
+    },
+    {
+      "name": "compare",
+      "description": "Entity versus buy-and-hold benchmark."
+    },
+    {
+      "name": "metrics",
+      "description": "Metric semantics and caveats."
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "limit",
+          "offset",
+          "total"
+        ]
+      },
+      "EntityWithMetrics": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Entity"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "metrics": {
+                "$ref": "#/components/schemas/Metrics"
+              }
+            },
+            "required": [
+              "metrics"
+            ]
+          }
+        ]
+      },
+      "Metrics": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "twr": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Time-weighted return over the window, net of fees where applicable.",
+            "example": "0.1432"
+          },
+          "benchTwrBtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "benchTwrEth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "benchTwrSol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "alphaBtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "twr − benchTwrBtc.",
+            "example": "0.1432"
+          },
+          "alphaEth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "alphaSol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "maxDrawdown": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "volatility": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Annualised standard deviation of period returns.",
+            "example": "0.1432"
+          },
+          "followerMedianReturn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "followerGap": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The entity's return minus its median follower's. Negative means followers did worse than the headline figure suggests.",
+            "example": "0.1432"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          }
+        },
+        "required": [
+          "asOf",
+          "twr",
+          "benchTwrBtc",
+          "benchTwrEth",
+          "benchTwrSol",
+          "alphaBtc",
+          "alphaEth",
+          "alphaSol",
+          "maxDrawdown",
+          "volatility",
+          "followerMedianReturn",
+          "followerGap",
+          "coverage"
+        ]
+      },
+      "Coverage": {
+        "type": "object",
+        "properties": {
+          "windowDays": {
+            "type": "integer",
+            "description": "Requested window. 0 means since inception.",
+            "example": 90
+          },
+          "daysCovered": {
+            "type": "integer",
+            "description": "Days of data actually present in the window.",
+            "example": 62
+          },
+          "isFullWindow": {
+            "type": "boolean",
+            "description": "False when the entity is younger than the window, or data is missing."
+          },
+          "sampling": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "downsampled"
+            ],
+            "description": "How dense the underlying series is. `downsampled` series come from venue history endpoints that thin older points, so a drawdown between two samples is invisible."
+          },
+          "navQuality": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "reported",
+              "derived",
+              "roi",
+              null
+            ],
+            "description": "`reported` — the venue published a true per-unit NAV or share price. `derived` — reconstructed from account value net of flows. `roi` — the venue published only a money-weighted return; not time-weighted and never ranked against the other two."
+          },
+          "headlineEligible": {
+            "type": "boolean",
+            "description": "False when the figure must not be ranked against others — money-weighted ROI, or a venue whose field semantics are not yet verified."
+          },
+          "feesApplied": {
+            "type": "boolean",
+            "description": "True when a fee haircut was applied because the venue reports gross. False when the venue already reports net, or no fee schedule is recorded."
+          }
+        },
+        "required": [
+          "windowDays",
+          "daysCovered",
+          "isFullWindow",
+          "sampling",
+          "navQuality",
+          "headlineEligible",
+          "feesApplied"
+        ]
+      },
+      "Entity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "example": "hyperliquid"
+          },
+          "externalId": {
+            "type": "string",
+            "example": "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
+          },
+          "kind": {
+            "type": "string",
+            "example": "vault"
+          },
+          "name": {
+            "type": "string"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "venueType": {
+            "type": "string",
+            "example": "dex"
+          },
+          "marketType": {
+            "type": "string",
+            "example": "perp"
+          },
+          "strategyCategory": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hand-assigned. Null means unclassified, not uncategorisable — read it before calling a market-neutral vault an underperformer for trailing BTC.",
+            "example": "neutral"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "inceptionDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active`, `closed` or `delisted`. Dead entities are retained deliberately: dropping them is how a leaderboard invents survivorship bias.",
+            "example": "active"
+          },
+          "firstSeenAt": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "externalId",
+          "kind",
+          "name",
+          "venue",
+          "venueType",
+          "marketType",
+          "strategyCategory",
+          "baseCurrency",
+          "inceptionDate",
+          "status",
+          "firstSeenAt",
+          "lastSeenAt"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Series": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NavPoint"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowPoint"
+            }
+          }
+        },
+        "required": [
+          "entityId",
+          "points",
+          "flows"
+        ]
+      },
+      "NavPoint": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "valuePerUnit": {
+            "type": "string",
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "navQuality": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "derived",
+              "roi"
+            ],
+            "description": "`reported` — the venue published a true per-unit NAV or share price. `derived` — reconstructed from account value net of flows. `roi` — the venue published only a money-weighted return; not time-weighted and never ranked against the other two."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "simple",
+              "dietz"
+            ],
+            "description": "How the point was produced. `dietz` means a flow occurred and its intra-period timing was unknown, so the denominator is mid-period weighted."
+          },
+          "sampling": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "downsampled"
+            ],
+            "description": "How dense the underlying series is. `downsampled` series come from venue history endpoints that thin older points, so a drawdown between two samples is invisible."
+          }
+        },
+        "required": [
+          "asOf",
+          "valuePerUnit",
+          "navQuality",
+          "method",
+          "sampling"
+        ]
+      },
+      "FlowPoint": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "netFlowUsd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          }
+        },
+        "required": [
+          "asOf",
+          "netFlowUsd"
+        ]
+      },
+      "Comparison": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAsOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "endAsOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "entity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexPoint"
+            }
+          },
+          "benchmarks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/IndexPoint"
+              }
+            },
+            "description": "Keyed by symbol. Each series is aligned to the same start date as the entity."
+          },
+          "coverage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Coverage"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "description": "Method disclosure that must be shown wherever the chart is shown."
+          }
+        },
+        "required": [
+          "entityId",
+          "startAsOf",
+          "endAsOf",
+          "entity",
+          "benchmarks",
+          "coverage",
+          "note"
+        ]
+      },
+      "IndexPoint": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "value": {
+            "type": "string",
+            "description": "Rebased to 100 at the first date common to every series in the response.",
+            "example": "112.4"
+          }
+        },
+        "required": [
+          "asOf",
+          "value"
+        ]
+      },
+      "Followers": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "asOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "2026-09-04",
+            "description": "UTC date."
+          },
+          "count": {
+            "type": "integer"
+          },
+          "medianReturn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "p25Return": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "p75Return": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "followers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Follower"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityId",
+          "asOf",
+          "count",
+          "medianReturn",
+          "p25Return",
+          "p75Return",
+          "followers",
+          "note"
+        ]
+      },
+      "Follower": {
+        "type": "object",
+        "properties": {
+          "depositor": {
+            "type": "string"
+          },
+          "equity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "pnl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "allTimePnl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exact decimal, as a string. Never parse this as a float.",
+            "example": "0.1432"
+          },
+          "daysFollowing": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "entryTime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "depositor",
+          "equity",
+          "pnl",
+          "allTimePnl",
+          "daysFollowing",
+          "entryTime"
+        ]
+      },
+      "MetricDefinition": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "caveats": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When this metric misleads. Read it before ranking on the metric."
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "unit",
+          "direction",
+          "caveats"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/entities": {
+      "get": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "List entities with their metrics for one window",
+        "description": "Closed and delisted entities are included by default. Pass `status=active` to exclude them, and understand that doing so reintroduces survivorship bias: the dead entities are the ones a leaderboard never shows you.",
+        "parameters": [
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0,
+              "example": 90
+            },
+            "required": false,
+            "name": "window",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "marketType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "directional",
+                "neutral",
+                "yield"
+              ]
+            },
+            "required": false,
+            "name": "strategyCategory",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "headlineEligible",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "fullWindow",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "twr",
+                "alphaBtc",
+                "maxDrawdown",
+                "volatility",
+                "followerGap",
+                "name"
+              ],
+              "default": "twr"
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "required": false,
+            "name": "direction",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entities and their newest metrics row for the window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "windowDays": {
+                      "type": "integer"
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EntityWithMetrics"
+                      }
+                    }
+                  },
+                  "required": [
+                    "windowDays",
+                    "pagination",
+                    "entities"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{id}": {
+      "get": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "One entity with every window it has metrics for",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entity and one metrics row per window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Entity"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "metrics": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Metrics"
+                          }
+                        }
+                      },
+                      "required": [
+                        "metrics"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{id}/series": {
+      "get": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "The derived per-unit value series, and the flows removed from it",
+        "description": "The flows are returned alongside on purpose: they are what was subtracted to stop a deposit reading as a gain, and publishing them is what makes the per-unit series checkable rather than merely asserted.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-unit series and flows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Series"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compare": {
+      "get": {
+        "tags": [
+          "compare"
+        ],
+        "summary": "An entity against buy-and-hold benchmarks, on one index base",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "entity",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "BTC,ETH,SOL",
+              "example": "BTC,ETH"
+            },
+            "required": false,
+            "name": "bench",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "window",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aligned, rebased series.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comparison"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/entities/{id}/followers": {
+      "get": {
+        "tags": [
+          "entities"
+        ],
+        "summary": "The depositor cross-section and its return distribution",
+        "description": "The gap between an entity's return and its median follower's is the number that matters to somebody deciding whether to copy it, and it is the number no venue publishes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Followers and distribution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Followers"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/definitions": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "What every metric means, and when it misleads",
+        "description": "Served from the `metric_definitions` table, not from this codebase. A metric only a frontend can interpret is invisible to an agent, so the semantics live in the database next to the numbers.",
+        "responses": {
+          "200": {
+            "description": "Metric semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "windows": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "Windows that currently have computed metrics. 0 is since inception."
+                    },
+                    "definitions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MetricDefinition"
+                      }
+                    }
+                  },
+                  "required": [
+                    "windows",
+                    "definitions"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

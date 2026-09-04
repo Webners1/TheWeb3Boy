@@ -39,6 +39,8 @@ Read `docs/traps.md` before touching any adapter, job, or analytical query.
 | `packages/ingest` | Daily snapshot job. The only package that writes raw data. |
 | `packages/backfill` | One-shot historical loaders. Writes flow through the same guarded path. |
 | `packages/compute` | Recomputes derived tables from raw snapshots. Writes derived data only. |
+| `packages/api` | Hono + zod-openapi read surface. Reads the database, never writes. |
+| `docs/openapi.json` | The published contract, checked in so a breaking change shows up in a diff. Regenerate with `pnpm openapi`. |
 | `packages/shared` | Zod primitives, decimal helpers, logger, storage client, run guards. |
 | `docs/traps.md` | Known data traps. Update it whenever a new one is discovered. |
 | `data/strategy-tags.json` | Hand-assigned strategy categories. A tag is a reviewable diff, never a row typed into production. |
@@ -75,6 +77,11 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Strategy categories are hand-assigned, never guessed | `packages/ingest/src/strategy-tags.test.ts` | automated |
 | Chamber chain codes are checked against the response | `packages/sources/src/chamber/adapter.test.ts` | automated |
 | Chamber fee numerators are basis points | `chamberFundSchema` refine + `chamber/adapter.test.ts` | automated |
+| `api` and `mcp` never write | `tools/check-harness.mjs` (`read-only-consumers`) | automated |
+| Coverage is required on every published figure | `packages/api/src/openapi.test.ts` asserts the spec marks it required | automated |
+| Money never crosses the wire as a JSON number | `packages/api/src/openapi.test.ts` | automated |
+| Dead entities are served by default | `packages/api/src/app.test.ts` | automated |
+| The benchmark chart charges the same entry cost as the alpha figure | `packages/core/src/rebase.test.ts` + `app.test.ts` | automated |
 | A recompute that produces nothing aborts | `evaluateRowBand` in `packages/shared` + `recompute.test.ts` | automated |
 
 The `judgement` and `pending` rows are the honest gaps. When a rule moves from
@@ -102,8 +109,11 @@ the database, and the boundary between them is the append-only line:
   of the raw tables and is safe to drop and rebuild. `derived-writes-only`
   fails the build if `compute` mutates a raw table.
 
-`scoped-db-writes` allows only `db`, `ingest` and `compute` to import database
-modules.
+`scoped-db-writes` allows only `db`, `ingest`, `compute`, `api` and `mcp` to
+import database modules. The last two are read surfaces: `read-only-consumers`
+fails the build if either mutates any table, raw or derived. A public read
+path that *can* write is one bug away from corrupting the archive, and the
+archive is the only thing here that cannot be rebuilt.
 
 ## Authority note: why derived NAV is not a raw column
 

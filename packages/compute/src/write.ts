@@ -99,6 +99,7 @@ export async function upsertMetrics(
       sampling: row.sampling,
       navQuality: row.navQuality ?? null,
       headlineEligible: row.headlineEligible,
+      feesApplied: row.feesApplied,
       computedAt,
     };
 

@@ -221,6 +221,10 @@ export const entityMetrics = pgTable(
     // False for venues that publish money-weighted ROI only. Such rows are
     // excluded from headline rankings.
     headlineEligible: boolean('headline_eligible').notNull(),
+    // Whether the twr above had a fee haircut applied. Stored rather than
+    // inferred: "it must have been, the venue reports gross" is a guess, and
+    // a guess about fees is exactly the kind of number we cannot defend.
+    feesApplied: boolean('fees_applied').notNull(),
     computedAt: timestamp('computed_at', { withTimezone: true }).notNull(),
   },
   (t) => [

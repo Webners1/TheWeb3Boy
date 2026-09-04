@@ -60,7 +60,25 @@ const SECRET_PATTERNS = [
 const DB_MODULES = ['@vaultbench/db', 'drizzle-orm', 'drizzle-kit', 'postgres', 'pg'];
 // `ingest` owns the raw tables; `compute` owns the derived ones and is held to
 // that by the derived-writes-only rule below.
-const DB_ALLOWED_PACKAGES = new Set(['db', 'ingest', 'compute']);
+const DB_WRITE_PACKAGES = new Set(['db', 'ingest', 'compute']);
+// Read-only consumers. They may open a database handle and select from it, but
+// a write from a package that serves HTTP is how a read path silently becomes
+// a write path. Held to that by the read-only-consumers rule below.
+const DB_READ_PACKAGES = new Set(['api', 'mcp']);
+const DB_ALLOWED_PACKAGES = new Set([...DB_WRITE_PACKAGES, ...DB_READ_PACKAGES]);
+
+const ALL_TABLES = [
+  'entities',
+  'entitySnapshots',
+  'depositors',
+  'benchmarkPrices',
+  'entityMetadataHistory',
+  'ingestRuns',
+  'entityFlows',
+  'entityNav',
+  'entityMetrics',
+  'metricDefinitions',
+];
 
 // ---------------------------------------------------------------------------
 // Rule 4 — packages/core performs zero I/O.
@@ -177,6 +195,32 @@ for (const file of [...new Set(scanTargets)]) {
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Rule 7 — Read-only consumers stay read-only.
+  //
+  // `api` and `mcp` are public read surfaces. Nothing they serve should be
+  // able to mutate a table, and "nobody would write that" is not a control.
+  // ---------------------------------------------------------------------------
+  if (!isGuard && !isTest && owningPackage && DB_READ_PACKAGES.has(owningPackage)) {
+    for (const table of ALL_TABLES) {
+      for (const mutation of MUTATIONS) {
+        const pattern = new RegExp(`\\.${mutation}\\s*\\(\\s*${table}\\b`);
+        if (pattern.test(code)) {
+          fail(
+            'read-only-consumers',
+            file,
+            `"${owningPackage}" is a read surface and may not ${mutation} ${table}`,
+          );
+        }
+      }
+    }
+    for (const pattern of [/\bexecute\s*\(\s*sql`\s*(?:insert|update|delete|truncate|drop|alter)/i]) {
+      if (pattern.test(code)) {
+        fail('read-only-consumers', file, `"${owningPackage}" may not execute a mutating statement`);
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +238,7 @@ const RULE_ORDER = [
   'scoped-db-writes',
   'core-zero-io',
   'derived-writes-only',
+  'read-only-consumers',
   'harness-present',
 ];
 

@@ -195,4 +195,30 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = [
       'time-weighted return is the error this column exists to prevent. A venue-published ' +
       'share price is more trustworthy than our reconstruction, not less.',
   },
+  {
+    key: 'headline_eligible',
+    label: 'Headline eligible',
+    description:
+      'Whether this figure may be ranked against other entities. False for ' +
+      "nav_quality='roi', and false for venues whose input semantics are not yet " +
+      'verified.',
+    unit: 'boolean',
+    direction: 'neutral',
+    caveats:
+      'An ineligible row is still a real measurement of that entity — it is simply not ' +
+      'comparable to the others. Show it on its own card, never in a league table.',
+  },
+  {
+    key: 'fees_applied',
+    label: 'Fees applied',
+    description:
+      'Whether a fee haircut was subtracted from the reported twr. True when the venue ' +
+      'reports gross performance and a fee schedule was on file for the entity.',
+    unit: 'boolean',
+    direction: 'neutral',
+    caveats:
+      'False has two very different meanings: the venue already reports net of fees, or ' +
+      'no fee schedule is recorded and the figure is gross. Read it with nav_quality ' +
+      'before comparing two entities from different venues.',
+  },
 ];
