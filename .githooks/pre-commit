@@ -1,0 +1,21 @@
+#!/bin/sh
+# Pre-Commit Guard (AGENTS.md § QA & Proof).
+#
+# Runs the native checks and refuses the commit on a non-zero exit. Install it
+# once per clone with:  pnpm run hooks:install
+#
+# Bypass is possible with `git commit --no-verify`, but doing so pushes the
+# failure into CI, where snapshot.yml fails the same way.
+
+set -e
+
+echo "pre-commit: harness guard"
+node tools/check-harness.mjs
+
+echo "pre-commit: typecheck"
+pnpm run typecheck
+
+echo "pre-commit: test"
+pnpm run test
+
+echo "pre-commit: OK"

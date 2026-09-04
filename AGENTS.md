@@ -37,3 +37,47 @@ Read `docs/traps.md` before touching any adapter, job, or analytical query.
 | `packages/backfill` | One-shot historical loaders. Writes flow through the same guarded path. |
 | `packages/shared` | Zod primitives, decimal helpers, logger, storage client. |
 | `docs/traps.md` | Known data traps. Update it whenever a new one is discovered. |
+
+## Proof — which rule is enforced by what
+
+A rule that nothing executes is a wish, not a constraint. Every rule above is
+listed here with the check that enforces it. Run all of them with `pnpm check`.
+
+| Rule | Enforced by | Kind |
+| --- | --- | --- |
+| No floating point in the data path | `tools/check-harness.mjs` (`no-floating-point`) | automated |
+| Money columns are Postgres `numeric` | `packages/db/src/schema.test.ts` | automated |
+| Numeric reaches TypeScript as `string` | `packages/db/src/schema.test.ts` | automated |
+| Never hardcode credentials or API keys | `tools/check-harness.mjs` (`no-hardcoded-secrets`) | automated |
+| `packages/sources` has zero database imports | `packages/sources/src/authority.test.ts` | automated |
+| Database writes are strictly scoped | `tools/check-harness.mjs` (`scoped-db-writes`) | automated |
+| Raw payloads are append-only | `LocalFileArchive.put` opens with `wx`; snapshots are keyed `(entity_id, as_of)` | automated |
+| Pre-Commit Guard runs native checks | `.githooks/pre-commit` — install with `pnpm run hooks:install` | automated |
+| `snapshot.yml` fails loudly on non-zero exit | `.github/workflows/snapshot.yml` runs the guard, typecheck and tests before ingest | automated |
+| No paid APIs | review-time | judgement |
+| Validate every external response with Zod | review-time until the first adapter lands | judgement |
+| Reuse `packages/shared` Zod primitives | review-time | judgement |
+| No new ORMs, queues, or wrapper layers | review-time | judgement |
+| Schema failures hard-abort the run | pending — `ingest` is still a stub that exits non-zero | pending |
+| Assert row counts against yesterday's | pending — `ingest_runs.rows_expected` exists, the assertion does not | judgement |
+
+The `judgement` and `pending` rows are the honest gaps. When a rule moves from
+judgement to automated, move its row and delete the exception.
+
+### Adding a rule
+
+A new rule is not done when it is written here. It is done when a check fails
+without it. Add the rule to this file, add its check to `tools/check-harness.mjs`
+or a package test, then confirm the check fails when the rule is violated
+before you land it.
+
+## Authority note: `ingest` vs `backfill`
+
+The rule above says `ingest` is the only package authorized to write. The
+repository also has a `backfill` package whose whole job is writing historical
+rows. These are reconciled as follows: `backfill` must not open its own
+database handle or issue its own writes — it loads and normalises history and
+routes every write through the guarded writer owned by `ingest`. Until that
+writer exists, both packages are stubs and `scoped-db-writes` allows `backfill`
+to import `@vaultbench/db` at all. Tighten the allowlist in
+`tools/check-harness.mjs` the moment the shared writer lands.

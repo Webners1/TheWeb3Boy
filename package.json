@@ -8,6 +8,9 @@
     "node": ">=22"
   },
   "scripts": {
+    "check": "pnpm run check:harness && pnpm run typecheck && pnpm run test",
+    "check:harness": "node tools/check-harness.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "ingest": "pnpm --filter @vaultbench/ingest start",
