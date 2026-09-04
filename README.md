@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# theweb3boy
 
-## Getting Started
+Personal brand site for Muzammil (theweb3boy) — a Web3 builder and AI engineer.
+Built with Next.js (App Router), TypeScript, and a hand-written WebGL/Three.js
+hero shader. No CSS framework — the design system lives in `src/app/globals.css`.
 
-First, run the development server:
+This repo is the **frontend only**. It does not contain the youVsBTC backend
+(ingestion, NAV computation, database) — that lives in a separate, private
+codebase. The dashboard at `/dashboard` currently renders clearly-labeled
+sample data until that backend exposes a public API to connect to.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Structure
+
+```
+src/app/            Routes: / (homepage), /dashboard (youVsBTC dashboard)
+src/app/globals.css Design system: colors, type, layout, all component styles
+src/lib/            Client-side effects: hero shader, duel chart, nav/contact/ticker
+public/hero.jpg     Hero background photo
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Develop
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Build
 
-## Learn More
+```bash
+npm run build
+npm run start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The hero shader is a hand-written GLSL fragment shader run through Three.js
+  (`src/lib/heroEffects.ts`): it renders the hero photo as a texture, applies
+  a cursor-following magnifying lens plus a subtle ripple/chromatic-aberration
+  distortion, and resolves the photo out of noise on first load.
+- Hotspot regions (`.hotspot` divs in `src/app/page.tsx`) are positioned from
+  hand-measured coordinates on the source photo (`data-uleft` / `data-uright`
+  / `data-vtop` / `data-vbottom`, as fractions of the 1500x500 image). Nudge
+  those values directly if a label doesn't line up with the real object.
+- Everything respects `prefers-reduced-motion` and pauses off-screen /
+  backgrounded rendering for performance.
