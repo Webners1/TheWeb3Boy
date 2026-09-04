@@ -39,7 +39,7 @@ type HotspotDef = {
 // real photo (you sit in front of part of the right monitor), the later
 // one in this list wins the hover.
 const HOTSPOT_DEFS: HotspotDef[] = [
-  { id: "pc", label: "My PC — main monitors", uLeft: 0.057, uRight: 0.57, vTop: 0.624, vBottom: 0.08 },
+  { id: "pc", label: "My PC, main monitors", uLeft: 0.057, uRight: 0.57, vTop: 0.624, vBottom: 0.08 },
   { id: "laptop", label: "My laptop", uLeft: 0.057, uRight: 0.2, vTop: 0.244, vBottom: 0.0 },
   { id: "mic", label: "My podcast mic and camera setup", uLeft: 0.333, uRight: 0.379, vTop: 0.254, vBottom: 0.064 },
   { id: "led1", label: "RGB LED setup", uLeft: 0.34, uRight: 0.372, vTop: 0.22, vBottom: 0.104 },
@@ -161,12 +161,14 @@ export default function HeroSpotlight() {
       {/* Layer 4: floating tooltip */}
       {hoveredItemText && (
         <motion.div
-          className="pointer-events-none absolute top-0 left-0 z-30 rounded-md border border-white/10 bg-black/80 px-3 py-1.5 font-mono text-xs tracking-wide text-white backdrop-blur-sm"
+          className="pointer-events-none absolute top-0 left-0 z-30 rounded-md border border-white/10 bg-black/80 px-3 py-1.5 text-xs tracking-wide backdrop-blur-sm"
           style={{
             x: smoothX,
             y: smoothY,
             marginLeft: 90,
             marginTop: -20,
+            color: "#F4EEE2",
+            fontFamily: "var(--font-mono)",
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
