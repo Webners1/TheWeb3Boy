@@ -479,3 +479,41 @@ If it happens again, the repair is to map each character of a non-ASCII run
 back to its cp1252 byte and decode the result as UTF-8, accepting only runs
 that decode without a replacement character. Bytes `0x80`-`0x9F` need a
 reverse cp1252 table; everything else maps to itself.
+## 24. A relative ARCHIVE_ROOT splits the archive per package
+
+`.env.example` documents `ARCHIVE_ROOT=./var/archive`, and for weeks that
+looked like it worked. It did not. pnpm runs each package's script with that
+package as the working directory, so the relative path resolved differently
+depending on which job was running:
+
+| job | where raw payloads actually landed |
+| --- | --- |
+| `pnpm ingest` | `packages/ingest/var/archive` |
+| `pnpm backfill` | `packages/backfill/var/archive` |
+
+Two archives, neither at the documented location, splitting the same entity's
+raw payloads across directories. Found only by looking for the Enzyme payload
+after a successful ingest and discovering that `var/archive` did not exist
+at all.
+
+Why this one matters more than it looks. The raw archive is the append-only
+ground truth — the thing every derived figure can be re-checked against, and
+the reason `entity_metrics` is safe to `TRUNCATE` and rebuild. Ground truth
+scattered under `packages/*/var/` is ground truth that a stray clean step
+discards without anyone noticing, because nothing reads it on the happy path.
+A backup of `var/archive` would have captured nothing.
+
+The failure was silent in both directions: the archive write succeeded, the
+ingest logged `ok`, and the documented path stayed empty. There was no error
+to see.
+
+`resolveArchiveRoot` in `packages/shared/src/storage.ts` now resolves a
+relative root against the workspace root — located by walking up for
+`pnpm-workspace.yaml` — so `./var/archive` means one place no matter which
+package is executing. An absolute root is left alone. The existing 27 payloads
+were moved into the single archive rather than dropped; raw data is
+append-only, including when the bug was ours.
+
+The general shape of this, worth watching for elsewhere: **a relative path in
+configuration is only meaningful next to a stated base.** In a monorepo the
+working directory is not that base, because it changes per script.

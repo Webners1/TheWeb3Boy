@@ -80,8 +80,41 @@ export function createArchiveFromEnv(): RawArchive {
   if (bucket) {
     return new S3Archive(bucket);
   }
-  const root = process.env.ARCHIVE_ROOT ?? path.join(process.cwd(), 'var', 'archive');
-  return new LocalFileArchive(root);
+  return new LocalFileArchive(resolveArchiveRoot(process.env.ARCHIVE_ROOT));
+}
+
+/**
+ * Where a relative `ARCHIVE_ROOT` actually points.
+ *
+ * Resolved against the workspace root, *not* `process.cwd()`. pnpm runs each
+ * package's script with that package as the working directory, so the
+ * documented `ARCHIVE_ROOT=./var/archive` silently became
+ * `packages/ingest/var/archive` for the daily job and
+ * `packages/backfill/var/archive` for the historical loader. Two archives,
+ * neither at the documented path, splitting the same entity's raw payloads
+ * across directories that a `pnpm clean` would not think twice about.
+ *
+ * Raw payloads are the append-only ground truth — the thing every derived
+ * figure can be re-checked against. They get one home.
+ */
+export function resolveArchiveRoot(configured: string | undefined): string {
+  const root = configured ?? './var/archive';
+  if (path.isAbsolute(root)) return root;
+  return path.resolve(workspaceRoot(), root);
+}
+
+/**
+ * Nearest ancestor holding `pnpm-workspace.yaml`. Falls back to the working
+ * directory, which is only reached when running outside the repository.
+ */
+function workspaceRoot(): string {
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return process.cwd();
+    dir = parent;
+  }
 }
 
 export function archiveRootExists(rootDir: string): boolean {
