@@ -9,7 +9,23 @@ export interface FetchJsonOptions {
   retries?: number;
   bucket?: TokenBucket;
   signal?: AbortSignal;
+  /**
+   * Minimum wait after a 429, in ms. Raise it for a venue that enforces its
+   * quota over a rolling window rather than per-instant.
+   */
+  rateLimitBackoffMs?: number;
 }
+
+/**
+ * Default floor for a 429 retry.
+ *
+ * A windowed quota does not care how patient the exponential curve is: while
+ * the window is hot, every retry inside it fails, so a 500ms→16s ramp just
+ * burns all five attempts and fails the run. Chamber's quota is 50 requests
+ * per rolling minute (docs/traps.md), so a 429 means "wait out the window",
+ * and one long sleep beats six doomed short ones.
+ */
+const DEFAULT_RATE_LIMIT_BACKOFF_MS = 65_000;
 
 const DEFAULT_UA = 'vaultbench/0.0.0 (ingest; +https://github.com/vaultbench)';
 
@@ -55,7 +71,10 @@ export async function fetchJson(url: string, options: FetchJsonOptions = {}): Pr
       const text = await response.text();
 
       if (response.status === 429 || response.status >= 500) {
-        const delay = backoffMs(attempt);
+        const delay =
+          response.status === 429
+            ? rateLimitDelay(response, options.rateLimitBackoffMs ?? DEFAULT_RATE_LIMIT_BACKOFF_MS)
+            : backoffMs(attempt);
         logger.warn('http retry', { url, status: response.status, attempt, delay });
         await sleep(delay);
         lastError = new HttpError(`HTTP ${response.status}`, response.status, url, text);
@@ -99,4 +118,19 @@ function backoffMs(attempt: number): number {
   const base = 500 * 2 ** attempt;
   const capped = Math.min(base, 30_000);
   return capped;
+}
+
+/**
+ * Honour `Retry-After` when the server sends one; otherwise wait out the
+ * floor. Chamber sends no such header, which is why the floor exists.
+ */
+export function rateLimitDelay(response: { headers: Headers }, floorMs: number): number {
+  const header = response.headers.get('retry-after');
+  if (header !== null) {
+    const seconds = Number.parseInt(header, 10);
+    if (Number.isInteger(seconds) && seconds > 0) return Math.max(seconds * 1000, 1000);
+    const date = Date.parse(header);
+    if (!Number.isNaN(date)) return Math.max(date - Date.now(), 1000);
+  }
+  return floorMs;
 }

@@ -42,9 +42,69 @@ export function selectWindow(
   return {
     points: selected,
     daysCovered,
-    isFullWindow: windowDays === INCEPTION_WINDOW ? selected.length > 1 : daysCovered >= windowDays,
+    isFullWindow:
+      windowDays === INCEPTION_WINDOW
+        ? selected.length > 1
+        : spansWindow(ordered, selected, startBound, endAsOf),
     sampling: classifySampling(selected),
   };
+}
+
+/**
+ * Does the record actually cover the window at both ends?
+ *
+ * Not `daysCovered >= windowDays`, which was the obvious test and the wrong
+ * one. On a series sampled every two days, whether an observation lands
+ * exactly on the cutoff date is a parity coin-flip against the window
+ * length — so a three-year-old vault reported `isFullWindow: false` for a
+ * 90-day window while reporting `true` for 365. Non-monotonic, and it made
+ * the one field a reader checks before trusting a figure answer a different
+ * question from the one they were asking.
+ *
+ * Two things have to hold, and they are the two ways a window genuinely
+ * fails to be full:
+ *
+ * 1. The record began at or before the window opened. Otherwise the entity
+ *    is younger than the window and this is not a 90-day return at all.
+ * 2. The record still runs to the window's end, within one sampling step.
+ *    Otherwise the figure is stale — a vault that stopped reporting two
+ *    months ago must not present its last reading as current.
+ */
+function spansWindow(
+  all: readonly NavPoint[],
+  selected: readonly NavPoint[],
+  startBound: string | undefined,
+  endAsOf: string,
+): boolean {
+  const last = selected[selected.length - 1];
+  if (last === undefined || startBound === undefined) return false;
+
+  // Looks at every point, not just the selected slice: an observation before
+  // the window is exactly the evidence that the record predates it.
+  const beganBeforeWindow = all.some((point) => point.asOf <= startBound);
+
+  // One step of tolerance, because a two-day series cannot be expected to
+  // land on the final date. Zero tolerance would fail every downsampled
+  // window; unlimited tolerance would call a dead vault current.
+  const runsToWindowEnd = dayDiff(last.asOf, endAsOf) <= samplingStepDays(selected);
+
+  return beganBeforeWindow && runsToWindowEnd;
+}
+
+/**
+ * The largest gap between consecutive observations, in days. Used as the
+ * staleness tolerance, so an irregular series is judged by its own coarsest
+ * spacing rather than by an assumed daily cadence.
+ */
+export function samplingStepDays(points: readonly NavPoint[]): number {
+  let widest = 1;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (previous === undefined || current === undefined) continue;
+    widest = Math.max(widest, dayDiff(previous.asOf, current.asOf));
+  }
+  return widest;
 }
 
 /**

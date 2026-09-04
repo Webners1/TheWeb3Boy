@@ -136,7 +136,30 @@ under the wrong key.
 Chamber addresses are also **not unique across chains**, so the external id is
 `chain:address`, never the bare address.
 
-## 14. A TVL floor at discovery invents deaths
+## 14. Chamber's rate limit is windowed, and bursting poisons the window
+
+The Data API documents only "rate limits may apply". Measured: **50 requests
+per rolling minute**, with no `Retry-After` header and no rate-limit headers
+of any kind.
+
+- A bucket of 5 req/s died about ten seconds into a 221-vault backfill.
+- At 1 req/s the first 429 arrived at request **51**, after 56s. A separate
+  run at 2 req/s also tripped at roughly 50 requests. Same ceiling, so it is
+  a count per window and not a rate.
+- 15 consecutive requests pass at 500ms spacing, which is why a short probe
+  finds nothing. Any probe shorter than 50 requests will tell you the limit
+  does not exist.
+
+Two consequences, both implemented:
+
+1. The adapter runs at **0.75 req/s** (45/min). A 221-vault chain takes about
+   five minutes, which beats a run that dies halfway and writes nothing.
+2. Exponential backoff is the wrong shape for a windowed quota. A 500ms→16s
+   ramp burns all five retries inside the hot window and fails. `fetchJson`
+   now waits out the window on a 429 — `Retry-After` when the server sends
+   one, otherwise a 65s floor.
+
+## 15. A TVL floor at discovery invents deaths
 
 Polygon alone returns ~1,579 Chamber vaults, most of them dust, and the
 temptation is to filter by TVL at ingestion. Do not. A vault that shrinks
@@ -148,7 +171,7 @@ The daily Chamber snapshot costs one request per chain regardless, because
 the fund list already carries `tokenPrice`, so there is no cost argument for
 a floor either.
 
-## 15. Open: Enzyme is unbuilt because the shape is unverifiable
+## 16. Open: Enzyme is unbuilt because the shape is unverifiable
 
 The Enzyme adapter is deliberately **not** written. What is known:
 
@@ -171,10 +194,41 @@ The Chamber work is the argument for this rule: every field name there was
 plausible and one of them (`adjustedTokenPrice`) meant something entirely
 different from what it said. Trap 12.
 
-## 16. Annualising an irregular series
+## 17. Annualising an irregular series
 
 Volatility is annualised by the *observed* mean step length, not an assumed
 daily cadence. Scaling a ~biweekly Hyperliquid backfill as if it were daily
 overstates volatility by roughly √14. `volatility()` returns `meanStepDays`
 so the caveat can be stated rather than hidden.
 
+
+## 18. `is_full_window` must not be decided by a day count
+
+The obvious test for "is this really a 90-day return?" is
+`daysCovered >= windowDays`. It is wrong, and it was shipped that way.
+
+On a series sampled every two days, whether an observation lands exactly on
+the window cutoff is a parity coin-flip against the window length. A
+three-year-old Chamber vault therefore reported `is_full_window: false` for
+90 days while reporting `true` for 365 — non-monotonic, and it made the one
+field a reader checks before trusting a figure answer a different question
+from the one they were asking. The tell was aggregate: a shorter window
+showing *fewer* full-window entities than a longer one is arithmetically
+impossible for honest data.
+
+`spansWindow` in `packages/core/src/series.ts` asks the two questions that
+are actually the ways a window fails to be full:
+
+1. Did the record begin at or before the window opened? If not, the entity
+   is younger than the window and this is not a 90-day return at all.
+2. Does the record still run to the window's end, within one sampling step?
+   If not, the figure is stale — a vault that stopped reporting two months
+   ago must not present its last reading as current.
+
+Sparse sampling *inside* a full window is not an incompleteness; it is
+disclosed by `days_covered` and `sampling`. Keep the three fields answering
+three different questions.
+
+Note that `sampling` is a provenance label — which endpoint the rows came
+from — not a measurement of spacing. A series tagged `daily` can still have
+gaps. `days_covered` is the field that catches that.

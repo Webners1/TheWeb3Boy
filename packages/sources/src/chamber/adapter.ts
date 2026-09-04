@@ -78,7 +78,16 @@ export class ChamberSource implements Source {
   private readonly backfillPeriod: ChamberPeriod;
   private readonly fetch: typeof fetchJson;
   private readonly onRaw?: AdapterHooks['onRaw'];
-  private readonly bucket = new TokenBucket(5, 5);
+  /**
+   * 0.75 req/s — 45 requests a minute, under a measured ceiling of 50.
+   *
+   * Measured, not guessed: the docs say only "rate limits may apply". Two
+   * separate runs both got their first 429 at exactly the 51st request, so
+   * the quota is 50 per rolling minute. A 221-vault chain therefore takes
+   * about five minutes to backfill, which is the right trade against a run
+   * that dies halfway and writes nothing. See docs/traps.md.
+   */
+  private readonly bucket = new TokenBucket(0.75, 1);
 
   private funds: ChamberFund[] | null = null;
 

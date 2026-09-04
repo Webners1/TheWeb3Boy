@@ -1,0 +1,33 @@
+# Local development database.
+#
+# Deliberately on 5433, not the default 5432: a developer machine often
+# already has a Postgres on 5432 belonging to something else, and pointing
+# VaultBench at it would mean creating tables in another project's database.
+#
+# The credentials here are for a throwaway local container and nothing else.
+# Real deployments read DATABASE_URL from the environment; never put a
+# production credential in this file.
+#
+#   docker compose up -d
+#   DATABASE_URL=postgres://vaultbench:vaultbench@localhost:5433/vaultbench
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vaultbench-postgres
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: vaultbench
+      POSTGRES_PASSWORD: vaultbench
+      POSTGRES_DB: vaultbench
+    volumes:
+      - vaultbench-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vaultbench -d vaultbench']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  vaultbench-pgdata:

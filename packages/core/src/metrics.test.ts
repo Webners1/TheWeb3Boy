@@ -7,6 +7,7 @@ import { depositorReturn, followerDistribution, followerGap, median } from './fo
 import { computeEntityMetrics } from './metrics.js';
 import { maxDrawdown, volatility } from './risk.js';
 import { INCEPTION_WINDOW, selectWindow } from './series.js';
+import { addDaysIso } from './dates.js';
 import type { BenchmarkClose, NavPoint } from './types.js';
 
 function nav(asOf: string, value: string, sampling: 'daily' | 'downsampled' = 'daily'): NavPoint {
@@ -142,7 +143,40 @@ describe('selectWindow', () => {
   it('clips to the requested window and reports the observed span only', () => {
     const window = selectWindow(points, '2026-01-10', 7);
     expect(window.points.map((point) => point.asOf)).toEqual(['2026-01-05', '2026-01-10']);
+    // The span is 6 days, not the requested 7, and says so.
     expect(window.daysCovered).toBe(6);
+    // Still a full window: the record began before it opened and runs to its
+    // end. That only two observations fall inside it is what daysCovered
+    // discloses — see spansWindow in series.ts.
+    expect(window.isFullWindow).toBe(true);
+  });
+
+  it('does not let sampling parity decide whether a window is full', () => {
+    // Two-day spacing over three years. Under the old `daysCovered >=
+    // windowDays` test this came out false for 90 days and true for 365,
+    // purely because of where the samples happened to land.
+    const twoDaily: NavPoint[] = [];
+    for (let day = 0; day < 540; day += 2) {
+      twoDaily.push(nav(addDaysIso('2025-01-01', day), '1'));
+    }
+    const endAsOf = twoDaily[twoDaily.length - 1]?.asOf ?? '';
+
+    for (const windowDays of [30, 90, 365]) {
+      const window = selectWindow(twoDaily, endAsOf, windowDays);
+      expect(window.isFullWindow).toBe(true);
+    }
+  });
+
+  it('calls a stale record incomplete rather than current', () => {
+    // A vault that stopped reporting two months ago must not present its
+    // last reading as a current 90-day return.
+    const stale = [
+      nav('2026-01-01', '1'),
+      nav('2026-01-02', '1.1'),
+      nav('2026-01-03', '1.2'),
+    ];
+    const window = selectWindow(stale, '2026-03-10', 90);
+    expect(window.points).toHaveLength(3);
     expect(window.isFullWindow).toBe(false);
   });
 
