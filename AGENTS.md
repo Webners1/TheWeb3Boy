@@ -55,11 +55,11 @@ listed here with the check that enforces it. Run all of them with `pnpm check`.
 | Pre-Commit Guard runs native checks | `.githooks/pre-commit` — install with `pnpm run hooks:install` | automated |
 | `snapshot.yml` fails loudly on non-zero exit | `.github/workflows/snapshot.yml` runs the guard, typecheck and tests before ingest | automated |
 | No paid APIs | review-time | judgement |
-| Validate every external response with Zod | review-time until the first adapter lands | judgement |
+| Validate every external response with Zod | `packages/sources/src/schemas.test.ts` plus adapter `parseOrThrow` | automated |
 | Reuse `packages/shared` Zod primitives | review-time | judgement |
 | No new ORMs, queues, or wrapper layers | review-time | judgement |
-| Schema failures hard-abort the run | pending — `ingest` is still a stub that exits non-zero | pending |
-| Assert row counts against yesterday's | pending — `ingest_runs.rows_expected` exists, the assertion does not | judgement |
+| Schema failures hard-abort the run | `packages/ingest/src/job.ts` records `ingest_runs.status='failed'` and writes nothing | automated |
+| Assert row counts against yesterday's | `packages/ingest/src/guards.test.ts` + `writeSourceBatch` | automated |
 
 The `judgement` and `pending` rows are the honest gaps. When a rule moves from
 judgement to automated, move its row and delete the exception.
@@ -76,8 +76,6 @@ before you land it.
 The rule above says `ingest` is the only package authorized to write. The
 repository also has a `backfill` package whose whole job is writing historical
 rows. These are reconciled as follows: `backfill` must not open its own
-database handle or issue its own writes — it loads and normalises history and
-routes every write through the guarded writer owned by `ingest`. Until that
-writer exists, both packages are stubs and `scoped-db-writes` allows `backfill`
-to import `@vaultbench/db` at all. Tighten the allowlist in
-`tools/check-harness.mjs` the moment the shared writer lands.
+database handle or issue its own writes — it is a thin CLI that calls
+`runBackfill` in `@vaultbench/ingest`. `scoped-db-writes` allows only `db`
+and `ingest` to import database modules.

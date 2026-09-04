@@ -19,7 +19,21 @@ export function parseDecimal(raw: string): Decimal {
 /**
  * Canonical fixed-point string for a Postgres `numeric` column.
  * Never exponential notation, never a float.
+ *
+ * Pass `scale` to match a column definition (e.g. 8 for `numeric(28,8)`).
  */
-export function toNumericString(value: Decimal): string {
-  return value.toFixed();
+export function toNumericString(value: Decimal, scale?: number): string {
+  return scale === undefined ? value.toFixed() : value.toFixed(scale);
+}
+
+/**
+ * Convert a JSON number (already IEEE-parsed by JSON.parse) into Decimal.
+ * DefiLlama prices and Hyperliquid fee fields arrive this way. This is not
+ * parseFloat — the number already exists; we only box it.
+ */
+export function decimalFromJsonNumber(value: number): Decimal {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`non-finite JSON number: ${value}`);
+  }
+  return new Decimal(value);
 }

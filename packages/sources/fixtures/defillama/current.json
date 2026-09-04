@@ -1,0 +1,22 @@
+{
+  "coins": {
+    "coingecko:bitcoin": {
+      "price": 80934.62953245104,
+      "symbol": "BTC",
+      "timestamp": 1788494090,
+      "confidence": 0.99
+    },
+    "coingecko:ethereum": {
+      "price": 2506.5509103722034,
+      "symbol": "ETH",
+      "timestamp": 1788494090,
+      "confidence": 0.99
+    },
+    "coingecko:solana": {
+      "price": 103.84921894523082,
+      "symbol": "SOL",
+      "timestamp": 1788494090,
+      "confidence": 0.99
+    }
+  }
+}

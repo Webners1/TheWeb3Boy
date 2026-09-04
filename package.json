@@ -13,8 +13,8 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "ingest": "pnpm --filter @vaultbench/ingest start",
-    "backfill": "pnpm --filter @vaultbench/backfill start",
+    "ingest": "pnpm --filter @vaultbench/ingest start --",
+    "backfill": "pnpm --filter @vaultbench/backfill start --",
     "db:generate": "pnpm --filter @vaultbench/db run generate"
   },
   "devDependencies": {

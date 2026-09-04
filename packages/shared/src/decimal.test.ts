@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseDecimal, toNumericString } from './decimal.js';
-import { decimalString } from './zod.js';
+import { decimalString, wireDecimal } from './zod.js';
 
 describe('parseDecimal', () => {
   it('preserves full precision on high-precision money strings', () => {
@@ -30,5 +30,12 @@ describe('decimalString', () => {
   it('rejects NaN and Infinity', () => {
     expect(decimalString.safeParse('NaN').success).toBe(false);
     expect(decimalString.safeParse('Infinity').success).toBe(false);
+  });
+});
+
+describe('wireDecimal', () => {
+  it('accepts JSON numbers without parseFloat', () => {
+    expect(wireDecimal.parse(42261)).toBe('42261');
+    expect(wireDecimal.parse(2281.59)).toBe('2281.59');
   });
 });

@@ -58,7 +58,7 @@ const SECRET_PATTERNS = [
 // Rule 3 — Database writes are strictly scoped.
 // ---------------------------------------------------------------------------
 const DB_MODULES = ['@vaultbench/db', 'drizzle-orm', 'drizzle-kit', 'postgres', 'pg'];
-const DB_ALLOWED_PACKAGES = new Set(['db', 'ingest', 'backfill']);
+const DB_ALLOWED_PACKAGES = new Set(['db', 'ingest']);
 
 const importSpecifiers = (code) => {
   const found = [];

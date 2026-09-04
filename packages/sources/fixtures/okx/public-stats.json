@@ -1,0 +1,15 @@
+{
+  "code": "0",
+  "data": [
+    {
+      "avgSubPosNotional": "0",
+      "ccy": "USDT",
+      "curCopyTraderPnl": "33398.0133187853452115",
+      "investAmt": "328475.2930111330323059",
+      "lossDays": "5",
+      "profitDays": "2",
+      "winRatio": "0.2857"
+    }
+  ],
+  "msg": ""
+}

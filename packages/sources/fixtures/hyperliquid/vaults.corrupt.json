@@ -1,0 +1,13 @@
+{
+  "apr": "not-a-number",
+  "pnls": [],
+  "summary": {
+    "name": "Broken",
+    "vaultAddress": "0x0000000000000000000000000000000000000001",
+    "leader": "0x0000000000000000000000000000000000000002",
+    "tvl": "1.0",
+    "isClosed": false,
+    "relationship": { "type": "normal" },
+    "createTimeMillis": 1
+  }
+}

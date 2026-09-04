@@ -49,3 +49,21 @@ datasets. Assert row counts against yesterday's count.
   abort the run, roll back, and exit non-zero. Do not commit a partial
   dataset as success.
 - Alert on silence, not just on errors.
+
+## 5. Parent/child linkage is inverted
+
+Hyperliquid `child` records are `{ type: "child" }` with no parent address.
+The parent record lists `data.childAddresses`. Build the map from parent →
+children, then set `parent_entity_id` on the children. Never sum TVL across
+a parent and its children.
+
+## 6. Followers are not always hex addresses
+
+`followers[].user` can be the literal `"Leader"`. Do not validate depositors
+as 0x hex.
+
+## 7. OKX timestamps can be empty strings
+
+Open subpositions return `closeTime: ""`. Treat empty string as null, not as
+epoch 0.
+

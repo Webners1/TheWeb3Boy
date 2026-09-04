@@ -1,0 +1,50 @@
+{
+  "coins": {
+    "coingecko:bitcoin": {
+      "symbol": "BTC",
+      "confidence": 0.99,
+      "prices": [
+        {
+          "timestamp": 1704067208,
+          "price": 42261
+        },
+        {
+          "timestamp": 1704153608,
+          "price": 44147
+        },
+        {
+          "timestamp": 1704239996,
+          "price": 44952
+        },
+        {
+          "timestamp": 1704326396,
+          "price": 42859
+        },
+        {
+          "timestamp": 1704412801,
+          "price": 44164
+        },
+        {
+          "timestamp": 1704499188,
+          "price": 44171
+        },
+        {
+          "timestamp": 1704585591,
+          "price": 43982
+        },
+        {
+          "timestamp": 1704672001,
+          "price": 43954
+        },
+        {
+          "timestamp": 1704758396,
+          "price": 46968
+        },
+        {
+          "timestamp": 1704844795,
+          "price": 46132
+        }
+      ]
+    }
+  }
+}

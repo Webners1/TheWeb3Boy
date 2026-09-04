@@ -1,0 +1,44 @@
+{
+  "code": "0",
+  "data": [
+    {
+      "ccy": "USDT",
+      "copyTotalPnl": "93312.4421384088325943",
+      "copyTraderNumChg": "320",
+      "copyTraderNumChgRatio": "0.112",
+      "copyTraders": [
+        {
+          "beginCopyTime": "1780688300000",
+          "nickName": "Angelica💖✧*｡㊖",
+          "pnl": "29130.0054147632807322",
+          "portLink": "https://static.okx.com/cdn/okex/users/headimages/20260604/324584bbfe8e42409a6dd2038379f497"
+        },
+        {
+          "beginCopyTime": "1746413563000",
+          "nickName": "🌈🐻洛欢💸Ⓑ",
+          "pnl": "27706.7066195193318866",
+          "portLink": "https://static.okx.com/cdn/okex/users/headimages/20241212/b62ad0eca8fd4db7b9edb56e48e99416"
+        },
+        {
+          "beginCopyTime": "1780687846000",
+          "nickName": "小楠5977฿TC",
+          "pnl": "11375.7039980896699638",
+          "portLink": "https://static.okx.com/cdn/okex/users/headimages/predefined/0027.png"
+        },
+        {
+          "beginCopyTime": "1757671359000",
+          "nickName": "神Vの龙.760",
+          "pnl": "7997.7302984731318653",
+          "portLink": "https://static.okx.com/cdn/okex/users/headimages/20250604/272f9990b96540998e113a0e71058395"
+        },
+        {
+          "beginCopyTime": "1746414102000",
+          "nickName": "BitCoin朝长.周",
+          "pnl": "6740.8831081666820033",
+          "portLink": "https://static.okx.com/cdn/okex/users/headimages/20250415/fbdd9e2361274b37b96dff10ad27f0b2"
+        }
+      ]
+    }
+  ],
+  "msg": ""
+}

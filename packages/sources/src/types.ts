@@ -73,3 +73,13 @@ export interface PriceSource {
     to: Date,
   ): Promise<Array<{ asOf: Date; closeUsd: Decimal }>>;
 }
+
+/**
+ * Optional sink used by ingest to gzip-archive a payload *before* Zod parse.
+ * Adapters never write to the database.
+ */
+export type RawSink = (name: string, payload: unknown) => Promise<void>;
+
+export interface AdapterHooks {
+  onRaw?: RawSink;
+}
