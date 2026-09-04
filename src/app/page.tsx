@@ -88,14 +88,23 @@ export default function Home() {
           <canvas id="glcanvas" />
           <div className="hero-scrim" />
           <div className="hero-hotspots" aria-hidden="true">
-            <div className="hotspot" data-uleft="0.433" data-uright="0.660" data-vtop="0.95" data-vbottom="0.0">
-              <span className="hotspot-label">theweb3boy</span>
+            <div className="hotspot" data-uleft="0.057" data-uright="0.570" data-vtop="0.624" data-vbottom="0.08">
+              <span className="hotspot-label">myPC</span>
             </div>
-            <div className="hotspot" data-uleft="0.339" data-uright="0.368" data-vtop="0.23" data-vbottom="0.076">
+            <div className="hotspot" data-uleft="0.057" data-uright="0.200" data-vtop="0.244" data-vbottom="0.0">
+              <span className="hotspot-label">Laptop</span>
+            </div>
+            <div className="hotspot" data-uleft="0.333" data-uright="0.379" data-vtop="0.254" data-vbottom="0.064">
+              <span className="hotspot-label">Mic</span>
+            </div>
+            <div className="hotspot" data-uleft="0.340" data-uright="0.372" data-vtop="0.22" data-vbottom="0.104">
               <span className="hotspot-label">LED 1</span>
             </div>
-            <div className="hotspot" data-uleft="0.057" data-uright="0.570" data-vtop="0.624" data-vbottom="0.0">
-              <span className="hotspot-label">myPC</span>
+            <div className="hotspot" data-uleft="0.307" data-uright="0.323" data-vtop="0.212" data-vbottom="0.172">
+              <span className="hotspot-label">LED 2</span>
+            </div>
+            <div className="hotspot" data-uleft="0.433" data-uright="0.660" data-vtop="0.96" data-vbottom="0.0">
+              <span className="hotspot-label">Me!! (theWeb3Boy)</span>
             </div>
           </div>
         </div>

@@ -290,7 +290,7 @@ function initHeroShader(): () => void {
       uv = mix(uv, lensUv, inLens);
       float rim = smoothstep(0.05, 0.0, abs(dist - lensRadius)) * u_magnifyAmount * 0.5;
 
-      float strength = smoothstep(0.4, 0.0, dist);
+      float strength = smoothstep(0.4, 0.0, dist) * (1.0 - inLens);
       float ripple = sin(dist * 34.0 - u_time * 3.2) * 0.018 * strength;
       vec2 distortedUv = uv + dir * ripple;
 
@@ -298,9 +298,11 @@ function initHeroShader(): () => void {
       float r = texture2D(u_texture, distortedUv + dir * caAmt).r;
       float g = texture2D(u_texture, distortedUv).g;
       float b = texture2D(u_texture, distortedUv - dir * caAmt).b;
-      vec3 color = vec3(r, g, b);
-      color = (color - 0.5) * 1.1 + 0.5;
-      color *= 0.82;
+      vec3 rawColor = vec3(r, g, b);
+      vec3 graded = (rawColor - 0.5) * 1.1 + 0.5;
+      graded *= 0.82;
+      vec3 clear = rawColor * 1.2;
+      vec3 color = mix(graded, clear, inLens);
       color += vec3(1.0) * rim;
 
       float block = hash21(floor(uv * 46.0));
@@ -359,6 +361,7 @@ function initHeroShader(): () => void {
   window.addEventListener("resize", resize);
   resize();
 
+  const scrimEl = document.querySelector<HTMLElement>(".hero-scrim");
   const start = performance.now();
   let rafId: number | null = null;
   let revealedCanvas = false;
@@ -380,6 +383,12 @@ function initHeroShader(): () => void {
     hotspotBoost += (boostTarget - hotspotBoost) * 0.12;
     uniforms.u_magnifyAmount.value = magnifyAmount;
     uniforms.u_hotspotBoost.value = hotspotBoost;
+    if (scrimEl) {
+      scrimEl.style.setProperty("--lens-x", `${mouseCurrent[0] * 100}%`);
+      scrimEl.style.setProperty("--lens-y", `${(1 - mouseCurrent[1]) * 100}%`);
+      const radius = magnifyAmount * (hotspotBoost > 0.5 ? 230 : 190);
+      scrimEl.style.setProperty("--lens-r", `${radius}px`);
+    }
     renderer.render(scene, camera);
     if (!revealedCanvas) {
       revealedCanvas = true;
