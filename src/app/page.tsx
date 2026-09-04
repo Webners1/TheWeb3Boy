@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import HeroSpotlight from "@/components/HeroSpotlight";
 import { initHeroEffects } from "@/lib/heroEffects";
 import { initDuelChart } from "@/lib/duelChart";
 import { initTicker, initContactMenu, initBlockCounter } from "@/lib/uiEffects";
@@ -78,36 +79,10 @@ export default function Home() {
       </header>
 
       <section id="hero">
-        <div className="hero-media">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="hero-photo"
-            src="/hero.jpg"
-            alt="Muzammil, a Web3 and AI builder, working at his desk at night with code on screen"
-          />
-          <canvas id="glcanvas" />
-          <div className="hero-scrim" />
-          <div className="hero-hotspots" aria-hidden="true">
-            <div className="hotspot" data-uleft="0.057" data-uright="0.570" data-vtop="0.624" data-vbottom="0.08">
-              <span className="hotspot-label">myPC</span>
-            </div>
-            <div className="hotspot" data-uleft="0.057" data-uright="0.200" data-vtop="0.244" data-vbottom="0.0">
-              <span className="hotspot-label">Laptop</span>
-            </div>
-            <div className="hotspot" data-uleft="0.333" data-uright="0.379" data-vtop="0.254" data-vbottom="0.064">
-              <span className="hotspot-label">Mic</span>
-            </div>
-            <div className="hotspot" data-uleft="0.340" data-uright="0.372" data-vtop="0.22" data-vbottom="0.104">
-              <span className="hotspot-label">LED 1</span>
-            </div>
-            <div className="hotspot" data-uleft="0.307" data-uright="0.323" data-vtop="0.212" data-vbottom="0.172">
-              <span className="hotspot-label">LED 2</span>
-            </div>
-            <div className="hotspot" data-uleft="0.433" data-uright="0.660" data-vtop="0.96" data-vbottom="0.0">
-              <span className="hotspot-label">Me!! (theWeb3Boy)</span>
-            </div>
-          </div>
+        <div className="absolute inset-0">
+          <HeroSpotlight />
         </div>
+        <div className="hero-scrim" />
         <div className="wrap hero-inner">
           <p className="eyebrow teal fade-up d1">6 years in Web3 &amp; AI · Karachi, PK</p>
           <h1 className="headline-kinetic">
