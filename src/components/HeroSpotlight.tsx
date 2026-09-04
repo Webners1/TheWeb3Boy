@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useMotionTemplate } from "framer-motion";
 
 /**
@@ -18,43 +18,85 @@ import { motion, useMotionValue, useSpring, useMotionTemplate } from "framer-mot
  */
 
 const IMAGE_URL = "https://pbs.twimg.com/profile_banners/1533699647683940352/1784648933/1500x500";
+const IMG_W = 1500;
+const IMG_H = 500;
 
-const LENS_RADIUS = 120;
+const LENS_RADIUS = 70;
 
-type Hotspot = {
+type HotspotDef = {
   id: string;
   label: string;
-  className: string;
+  /** Fractions of the *source photo* (0..1), not the container - u is
+   * left-to-right, v is bottom-to-top (v=1 is the top of the image). */
+  uLeft: number;
+  uRight: number;
+  vTop: number;
+  vBottom: number;
 };
 
-// Positioned from an actual pixel-by-pixel pass over the source photo
-// (1500x500), converted to plain percentages of this container. Because
-// this uses simple top/left/width/height rather than a cover-fit-aware
-// mapping, these will drift slightly at container aspect ratios far from
-// the photo's own 3:1 - nudge the percentages below if a box sits off
-// the real object.
-const HOTSPOTS: Hotspot[] = [
-  {
-    id: "face",
-    label: "This is me, the Web 3 Boy",
-    className: "top-[5%] left-[43%] w-[15%] h-[47%]",
-  },
-  {
-    id: "mic",
-    label: "My podcast mic and camera setup",
-    className: "top-[73%] left-[33%] w-[5%] h-[19%]",
-  },
-  {
-    id: "led",
-    label: "RGB LED Setup",
-    className: "top-[77%] left-[34%] w-[4%] h-[13%]",
-  },
+// Measured from an actual pixel-by-pixel pass over the source photo
+// (1500x500). Ordered back-to-front: where two regions overlap in the
+// real photo (you sit in front of part of the right monitor), the later
+// one in this list wins the hover.
+const HOTSPOT_DEFS: HotspotDef[] = [
+  { id: "pc", label: "My PC — main monitors", uLeft: 0.057, uRight: 0.57, vTop: 0.624, vBottom: 0.08 },
+  { id: "laptop", label: "My laptop", uLeft: 0.057, uRight: 0.2, vTop: 0.244, vBottom: 0.0 },
+  { id: "mic", label: "My podcast mic and camera setup", uLeft: 0.333, uRight: 0.379, vTop: 0.254, vBottom: 0.064 },
+  { id: "led1", label: "RGB LED setup", uLeft: 0.34, uRight: 0.372, vTop: 0.22, vBottom: 0.104 },
+  { id: "led2", label: "LED indicator", uLeft: 0.307, uRight: 0.323, vTop: 0.212, vBottom: 0.172 },
+  { id: "face", label: "This is me, the Web 3 Boy", uLeft: 0.433, uRight: 0.66, vTop: 0.96, vBottom: 0.0 },
 ];
+
+type ScreenRect = { left: string; top: string; width: string; height: string };
+
+/** Mirrors the CSS `background-size: cover` crop so hotspot boxes land on
+ * the real object regardless of the container's aspect ratio. */
+function useHotspotRects(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const [rects, setRects] = useState<Record<string, ScreenRect>>({});
+
+  useEffect(() => {
+    function layout() {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const resRatio = rect.width / rect.height;
+      const imgRatio = IMG_W / IMG_H;
+      const scale = resRatio > imgRatio ? { x: 1, y: resRatio / imgRatio } : { x: imgRatio / resRatio, y: 1 };
+
+      const toScreen = (u: number, v: number) => ({
+        x: (u - 0.5) * scale.x + 0.5,
+        y: 1 - ((v - 0.5) * scale.y + 0.5),
+      });
+
+      const next: Record<string, ScreenRect> = {};
+      for (const h of HOTSPOT_DEFS) {
+        const tl = toScreen(h.uLeft, h.vTop);
+        const br = toScreen(h.uRight, h.vBottom);
+        next[h.id] = {
+          left: `${tl.x * 100}%`,
+          top: `${tl.y * 100}%`,
+          width: `${(br.x - tl.x) * 100}%`,
+          height: `${(br.y - tl.y) * 100}%`,
+        };
+      }
+      setRects(next);
+    }
+
+    layout();
+    window.addEventListener("resize", layout);
+    return () => window.removeEventListener("resize", layout);
+  }, [containerRef]);
+
+  return rects;
+}
 
 export default function HeroSpotlight() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredItemText, setHoveredItemText] = useState<string | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+  const rects = useHotspotRects(containerRef);
 
   // Raw cursor position, relative to the container. Plain motion values -
   // updating these never triggers a React re-render.
@@ -92,10 +134,11 @@ export default function HeroSpotlight() {
 
       {/* Layer 2: hotspot map */}
       <div className="absolute inset-0 z-10">
-        {HOTSPOTS.map((spot) => (
+        {HOTSPOT_DEFS.map((spot) => (
           <div
             key={spot.id}
-            className={`absolute cursor-crosshair ${spot.className}`}
+            className="absolute cursor-crosshair"
+            style={rects[spot.id]}
             onMouseEnter={() => setHoveredItemText(spot.label)}
             onMouseLeave={() => setHoveredItemText(null)}
           />
@@ -122,7 +165,7 @@ export default function HeroSpotlight() {
           style={{
             x: smoothX,
             y: smoothY,
-            marginLeft: 140,
+            marginLeft: 90,
             marginTop: -20,
           }}
           initial={{ opacity: 0 }}
