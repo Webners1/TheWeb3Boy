@@ -87,7 +87,7 @@ export default function Dashboard() {
   const { visible, hiddenCount } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const searched = q
-      ? entities.filter((e) => e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q))
+      ? entities.filter((e) => e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q) || e.externalId.toLowerCase().includes(q))
       : entities;
     if (!hideOutliers) return { visible: searched, hiddenCount: 0 };
     const kept = searched.filter((e) => !isArtifact(e));
@@ -259,12 +259,12 @@ export default function Dashboard() {
 
           <div className="control control-grow">
             <label className="control-label" htmlFor="search">
-              Search
+              Search loaded vaults
             </label>
             <input
               id="search"
               className="search-input"
-              placeholder="Vault address or venue"
+              placeholder="Name, address or venue"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -339,6 +339,11 @@ export default function Dashboard() {
           <span className="window-tag">{WINDOWS.find((w) => w.value === windowDays)?.label} window</span>
         </h2>
 
+        <p className="api-note">
+          Each vault uses its latest available record; dates can differ.
+          {!fullWindow && " Exploring partial and excluded records — these are not all eligible for ranking."}
+        </p>
+
         {listError && (
           <p className="error-note">
             Couldn&apos;t reach the API ({listError}). Base URL: <code>{API_BASE}</code>
@@ -391,6 +396,7 @@ export default function Dashboard() {
                       <span className={`pill ${m?.coverage.isFullWindow ? "up" : "down"}`}>
                         {m ? `${m.coverage.daysCovered}d` : "—"}
                       </span>
+                      {m && <div className="api-note">As of {m.asOf}</div>}
                     </td>
                     <td>
                       <span className="row-cta">Compare →</span>

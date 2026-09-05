@@ -6,8 +6,11 @@ hero shader. No CSS framework — the design system lives in `src/app/globals.cs
 
 This repo is the **frontend only**. It does not contain the youVsBTC backend
 (ingestion, NAV computation, database) — that lives in a separate, private
-codebase. The dashboard at `/dashboard` currently renders clearly-labeled
-sample data until that backend exposes a public API to connect to.
+codebase. The dashboard at `/dashboard` calls the live Railway API configured
+by `NEXT_PUBLIC_VAULTBENCH_URL`. Its origin must be allowed by the API's CORS
+configuration. Records carry their own dates and coverage; the list is not a
+common-date ranking. Turning off "Full window only" enables exploration of
+partial and excluded records.
 
 ## Structure
 
