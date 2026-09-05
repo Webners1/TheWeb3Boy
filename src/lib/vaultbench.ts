@@ -146,8 +146,10 @@ export function listEntities(q: EntityQuery = {}) {
     status: q.status,
     sort: q.sort ?? "alphaBtc",
     direction: q.direction ?? "desc",
+    // Partial records require the API's explicit exploration mode.
+    view: q.fullWindow === false ? "explore" : undefined,
     fullWindow: q.fullWindow ? "true" : undefined,
-    headlineEligible: q.headlineEligible ? "true" : undefined,
+    headlineEligible: q.headlineEligible === undefined ? undefined : String(q.headlineEligible),
     limit: q.limit ?? 50,
     offset: q.offset ?? 0,
   });
