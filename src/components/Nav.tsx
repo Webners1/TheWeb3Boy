@@ -81,6 +81,10 @@ export default function Nav() {
               <span className="ndi-name">youVsBTC</span>
               <span className="ndi-status">In development</span>
             </Link>
+            <Link href="/youvsbtc" className="nav-dropdown-item">
+              <span className="ndi-name">How it works</span>
+              <span className="ndi-status">Compare performance</span>
+            </Link>
             <p className="nav-dropdown-note">More tools ship here as they&apos;re ready.</p>
           </div>
         </li>
@@ -120,6 +124,9 @@ export default function Nav() {
         </a>
         <Link href="/dashboard" onClick={() => setOpen(false)}>
           youVsBTC dashboard
+        </Link>
+        <Link href="/youvsbtc" onClick={() => setOpen(false)}>
+          How youVsBTC works
         </Link>
         <a href="#about" onClick={() => setOpen(false)}>
           About

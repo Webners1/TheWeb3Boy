@@ -131,6 +131,10 @@ export default function Home() {
                   <span>Open the dashboard</span>
                   <span className="tool-github-arrow">↗</span>
                 </Link>
+                <Link className="tool-github" href="/youvsbtc">
+                  <span>How the comparison works</span>
+                  <span className="tool-github-arrow">↗</span>
+                </Link>
               </div>
               <div className="tool-preview">
                 <canvas id="duelCanvas" aria-hidden="true" />
