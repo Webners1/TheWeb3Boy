@@ -23,7 +23,7 @@ page.on("response", (r) => {
 });
 
 await page.goto(URL, { waitUntil: "networkidle" });
-await page.waitForSelector(".yv-row", { timeout: 25000 });
+await page.waitForSelector(".yv-row, .yv-dash", { timeout: 25000 });
 await page.waitForTimeout(600);
 
 const rowCount = await page.locator(".yv-row").count();

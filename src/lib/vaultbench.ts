@@ -14,17 +14,24 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_VAULTBENCH_URL?.replace(/\/$/, "") ||
   "https://api-production-e1b0.up.railway.app";
 
+export type NavQuality = "reported" | "derived" | "roi";
+
 export type Coverage = {
   windowDays: number;
   daysCovered: number;
   isFullWindow: boolean;
   sampling: string;
-  navQuality: string;
+  navQuality: NavQuality | null;
   headlineEligible: boolean;
   feesApplied: boolean;
+  benchmarks: {
+    btc: "ok" | "unavailable";
+    eth: "ok" | "unavailable";
+    sol: "ok" | "unavailable";
+  };
 };
 
-export type Metrics = {
+export type MetricRow = {
   asOf: string;
   twr: string | null;
   benchTwrBtc: string | null;
@@ -44,9 +51,31 @@ export type Metrics = {
   followerMedianReturn: string | null;
   followerGap: string | null;
   coverage: Coverage;
-} | null;
+};
 
-export type Entity = {
+export type Metrics = MetricRow | null;
+
+export type FeeTerm = {
+  status: string;
+  value: string | null;
+  rawRef: string | null;
+  rawFieldPath: string | null;
+};
+
+export type FeeCoverage = {
+  status: string;
+  managementFee: FeeTerm;
+  performanceFee: FeeTerm;
+  leaderCommission: FeeTerm;
+  streamingFee: FeeTerm;
+  entryFee: FeeTerm;
+  exitFee: FeeTerm;
+  redemptionPeriodDays: FeeTerm;
+  highWaterMark: FeeTerm;
+  note: string | null;
+};
+
+export type EntityBase = {
   id: string;
   source: string;
   externalId: string;
@@ -59,12 +88,22 @@ export type Entity = {
   baseCurrency: string;
   inceptionDate: string | null;
   status: string;
-  /** AUM in USD as the venue last reported it. Null when the venue doesn't publish one. */
+  provenance: string;
+  copyMode: string | null;
+  positionsVisible: boolean | null;
+  managerStakeRatio: string | null;
+  pendingRedemptionsUsd: string | null;
   aumUsd: string | null;
-  /** Snapshot date for `aumUsd`. Independent of `metrics.asOf`. */
   aumAsOf: string | null;
-  metrics: Metrics;
+  fees: FeeCoverage;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  externalUrl: string | null;
 };
+
+export type Entity = EntityBase & { metrics: Metrics };
+
+export type EntityDetail = EntityBase & { metrics: MetricRow[] };
 
 export type EntitiesResponse = {
   windowDays: number;
@@ -72,15 +111,76 @@ export type EntitiesResponse = {
   entities: Entity[];
 };
 
+export type EntitiesSummary = {
+  windowDays: number;
+  view: "ranking" | "explore";
+  total: number;
+  withMetrics: number;
+  beatBtc: number;
+  medianTwr: string | null;
+  bestAlphaBtc: string | null;
+  bestEntityId: string | null;
+  capitalUsd: string | null;
+};
+
 export type SeriesPoint = { asOf: string; value: string };
+
+export type NavPoint = {
+  asOf: string;
+  valuePerUnit: string;
+  navQuality: string;
+  method: string;
+  sampling: string;
+};
+
+export type FlowPoint = { asOf: string; netFlowUsd: string | null };
+
+export type SeriesResponse = {
+  entityId: string;
+  points: NavPoint[];
+  flows: FlowPoint[];
+};
 
 export type CompareResponse = {
   entityId: string;
-  startAsOf: string;
-  endAsOf: string;
+  startAsOf: string | null;
+  endAsOf: string | null;
   entity: SeriesPoint[];
   benchmarks: Record<string, SeriesPoint[]>;
-  coverage: Coverage;
+  coverage: Coverage | null;
+  note: string;
+};
+
+export type Follower = {
+  depositor: string;
+  equity: string | null;
+  pnl: string | null;
+  allTimePnl: string | null;
+  daysFollowing: number | null;
+  entryTime: string | null;
+};
+
+export type FollowersResponse = {
+  entityId: string;
+  asOf: string | null;
+  count: number;
+  medianReturn: string | null;
+  p25Return: string | null;
+  p75Return: string | null;
+  followers: Follower[];
+  coverage: {
+    status: "current" | "stale" | "unavailable";
+    lagDays: number | null;
+    reasons: string[];
+    lastFailure: {
+      asOf: string | null;
+      endpoint: string | null;
+      httpStatus: number | null;
+      upstreamCode: string | null;
+      upstreamMessage: string | null;
+      rawRef: string | null;
+    } | null;
+  };
   note: string;
 };
 
@@ -111,10 +211,17 @@ export const SORTS = [
   { value: "name", label: "Name" },
 ] as const;
 
+export type EntityView = "ranking" | "explore";
+
 export type EntityQuery = {
   window?: number;
+  view?: EntityView;
   source?: string;
+  kind?: string;
   status?: string;
+  marketType?: string;
+  strategyCategory?: string;
+  search?: string;
   sort?: string;
   direction?: "asc" | "desc";
   fullWindow?: boolean;
@@ -123,12 +230,23 @@ export type EntityQuery = {
   offset?: number;
 };
 
-/** The API answers 4xx with { error, detail }; surface that rather than a bare status. */
-async function get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
-  const url = new URL(API_BASE + path);
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
+export type QueryValue = string | number | boolean | undefined;
+
+/** Preserve explicit `false`. Omit only `undefined`. */
+export function toSearchParams(params: Record<string, QueryValue>): URLSearchParams {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue;
+    search.set(key, String(value));
   }
+  return search;
+}
+
+/** The API answers 4xx with { error, detail }; surface that rather than a bare status. */
+async function get<T>(path: string, params: Record<string, QueryValue> = {}): Promise<T> {
+  const url = new URL(API_BASE + path);
+  const search = toSearchParams(params);
+  search.forEach((value, key) => url.searchParams.set(key, value));
   const res = await fetch(url.toString(), { headers: { accept: "application/json" } });
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
@@ -143,20 +261,48 @@ async function get<T>(path: string, params: Record<string, string | number | und
   return (await res.json()) as T;
 }
 
-export function listEntities(q: EntityQuery = {}) {
-  return get<EntitiesResponse>("/entities", {
+export function entityListParams(q: EntityQuery = {}): Record<string, QueryValue> {
+  const view = q.view ?? "ranking";
+  return {
     window: q.window ?? 90,
+    view,
     source: q.source,
+    kind: q.kind,
     status: q.status,
-    sort: q.sort ?? "alphaBtc",
-    direction: q.direction ?? "desc",
-    // Partial records require the API's explicit exploration mode.
-    view: q.fullWindow === false ? "explore" : undefined,
-    fullWindow: q.fullWindow ? "true" : undefined,
-    headlineEligible: q.headlineEligible === undefined ? undefined : String(q.headlineEligible),
+    marketType: q.marketType,
+    strategyCategory: q.strategyCategory,
+    search: q.search,
+    sort: q.sort ?? (view === "explore" ? "name" : "alphaBtc"),
+    direction: q.direction ?? (view === "explore" ? "asc" : "desc"),
+    fullWindow: q.fullWindow,
+    headlineEligible: q.headlineEligible,
     limit: q.limit ?? 50,
     offset: q.offset ?? 0,
-  });
+  };
+}
+
+export function listEntities(q: EntityQuery = {}) {
+  return get<EntitiesResponse>("/entities", entityListParams(q));
+}
+
+export function entitiesSummary(q: EntityQuery = {}) {
+  const params = entityListParams(q);
+  delete params.limit;
+  delete params.offset;
+  delete params.direction;
+  return get<EntitiesSummary>("/entities/summary", params);
+}
+
+export function getEntity(id: string) {
+  return get<EntityDetail>(`/entities/${id}`);
+}
+
+export function getSeries(id: string, range: { from?: string; to?: string } = {}) {
+  return get<SeriesResponse>(`/entities/${id}/series`, range);
+}
+
+export function getFollowers(id: string, limit = 100) {
+  return get<FollowersResponse>(`/entities/${id}/followers`, { limit });
 }
 
 export function compare(entityId: string, bench = "BTC,ETH,SOL", window = 90) {
@@ -178,8 +324,6 @@ export function formatPct(v: string | null | undefined, digits = 1): string {
   const n = num(v);
   if (n === null) return "—";
   const pct = n * 100;
-  // Degenerate vaults in this dataset can carry returns in the billions of
-  // percent; abbreviate rather than printing an unreadable wall of digits.
   if (Math.abs(pct) >= 1_000_000) return `${pct < 0 ? "−" : "+"}${(Math.abs(pct) / 1_000_000).toFixed(1)}M%`;
   if (Math.abs(pct) >= 10_000) return `${pct < 0 ? "−" : "+"}${(Math.abs(pct) / 1000).toFixed(1)}k%`;
   return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(digits)}%`;

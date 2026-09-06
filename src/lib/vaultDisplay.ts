@@ -5,11 +5,11 @@
  */
 
 import type { CSSProperties } from "react";
-import { formatPct, num, shortName, type Entity, type SeriesPoint } from "@/lib/vaultbench";
+import { formatPct, num, shortName, type Entity, type NavQuality, type SeriesPoint } from "@/lib/vaultbench";
 
 export const WATCH_KEY = "youvsbtc:watchlist:v1";
 export const GRID =
-  "minmax(190px,2.1fr) minmax(110px,1fr) 100px .82fr .78fr 1.12fr .68fr .68fr .82fr .92fr 92px";
+  "minmax(190px,2.1fr) minmax(110px,1fr) 100px .82fr .78fr 1.12fr .68fr .68fr .82fr .92fr 92px 88px";
 export const PIN_TONES = ["#5FD8C9", "#B58AFF", "#D8B25F"] as const;
 export const BENCH_COLORS: Record<string, string> = {
   BTC: "#E2793B",
@@ -27,12 +27,12 @@ export const WINDOW_OPTS = [
 export const GLOSSARY: Record<string, [string, string]> = {
   ret: [
     "Return",
-    "Time-weighted return over the window. Deposits and withdrawals are stripped out, so a vault can't look good just because money flowed in.",
+    "Time-weighted return over the window. Deposits and withdrawals are stripped out, so a vault can't look good just because money flowed in. Unavailable means the figure was not computed — not a 0% return.",
   ],
   btc: ["BTC return", "Buy-and-hold Bitcoin over exactly the same dates as the vault's coverage."],
   alpha: [
     "Alpha vs BTC",
-    "Vault return minus BTC return over the same dates. Positive means you'd have done better here than holding BTC.",
+    "Vault return minus BTC return over the same dates. Positive means you'd have done better here than holding BTC. Null unless both legs exist.",
   ],
   beta: ["Beta", "How hard the vault moves with BTC. 1.0 tracks BTC; 0 is market-neutral; negative moves against it."],
   vol: ["Volatility", "Annualised standard deviation of daily returns — how bumpy the ride was."],
@@ -44,44 +44,50 @@ export const GLOSSARY: Record<string, [string, string]> = {
   ],
   nav: [
     "NAV quality",
-    "Verified NAV passes upstream sanity checks. Partial has gaps. Artifact means reported return above ±1000% or beta above ±50 — a data fault, not performance.",
+    "Backend values: reported (venue NAV), derived (reconstructed net of flows), roi (money-weighted, never ranked with the others), or unavailable.",
   ],
 };
 
-export const NAV_META = {
-  verified: { label: "Verified", color: "#5FD8C9", note: "NAV passes sanity checks" },
-  partial: { label: "Partial", color: "#D8B25F", note: "gaps in NAV history" },
-  artifact: { label: "Artifact", color: "#E2793B", note: "upstream NAV fault, not performance" },
-} as const;
-
-export type NavKind = keyof typeof NAV_META;
+export const NAV_META: Record<NavQuality, { label: string; color: string; note: string }> = {
+  reported: { label: "Reported", color: "#5FD8C9", note: "Venue-published per-unit NAV" },
+  derived: { label: "Derived", color: "#D8B25F", note: "Reconstructed from account value net of flows" },
+  roi: { label: "ROI", color: "#E2793B", note: "Money-weighted only — not ranked against time-weighted NAV" },
+};
 
 export type Vault = {
   id: string;
   name: string;
+  fullName: string;
   addr: string;
   venue: string;
+  source: string;
+  kind: string;
+  status: string;
+  marketType: string | null;
+  strategyCategory: string | null;
+  externalUrl: string | null;
   aum: number | null;
-  ret: number;
-  btc: number;
+  ret: number | null;
+  btc: number | null;
   eth: number | null;
   sol: number | null;
   beta: number | null;
-  vol: number;
-  dd: number;
-  days: number;
-  nav: NavKind;
+  vol: number | null;
+  dd: number | null;
+  days: number | null;
+  nav: NavQuality | null;
+  headlineEligible: boolean | null;
+  hasMetrics: boolean;
   asOf: string | null;
 };
 
-export type SortKey = "alpha" | "ret" | "dd" | "vol" | "aum" | "days" | "name";
+export type SortKey = "alpha" | "ret" | "dd" | "vol" | "name";
 
 export const SORT_CHIPS: [SortKey, string][] = [
   ["alpha", "Alpha"],
   ["ret", "Return"],
   ["dd", "Drawdown"],
   ["vol", "Volatility"],
-  ["aum", "Capital"],
   ["name", "Name"],
 ];
 
@@ -90,12 +96,10 @@ export const SORT_LABELS: Record<SortKey, string> = {
   ret: "return",
   dd: "max drawdown",
   vol: "volatility",
-  aum: "capital",
-  days: "coverage",
   name: "name",
 };
 
-export const API_SORT: Partial<Record<SortKey, string>> = {
+export const API_SORT: Record<SortKey, string> = {
   alpha: "alphaBtc",
   ret: "twr",
   dd: "maxDrawdown",
@@ -103,15 +107,10 @@ export const API_SORT: Partial<Record<SortKey, string>> = {
   name: "name",
 };
 
-export function navOf(e: Entity): NavKind {
-  const m = e.metrics;
-  if (!m) return "partial";
-  const twr = num(m.twr);
-  const beta = num(m.betaBtc);
-  if ((twr !== null && Math.abs(twr) > 10) || (beta !== null && Math.abs(beta) > 50)) return "artifact";
-  if (!m.coverage.isFullWindow || m.coverage.navQuality === "partial") return "partial";
-  if (m.coverage.navQuality === "artifact") return "artifact";
-  return "verified";
+export function navOf(e: Entity): NavQuality | null {
+  const quality = e.metrics?.coverage.navQuality;
+  if (quality === "reported" || quality === "derived" || quality === "roi") return quality;
+  return null;
 }
 
 export function shortAddr(id: string): string {
@@ -122,34 +121,51 @@ export function shortAddr(id: string): string {
 
 export function toVault(e: Entity): Vault {
   const m = e.metrics;
+  const dd = num(m?.maxDrawdown);
   return {
     id: e.id,
     name: shortName(e.name),
+    fullName: e.name,
     addr: shortAddr(e.externalId),
     venue: e.venue,
+    source: e.source,
+    kind: e.kind,
+    status: e.status,
+    marketType: e.marketType,
+    strategyCategory: e.strategyCategory,
+    externalUrl: e.externalUrl ?? null,
     aum: num(e.aumUsd),
-    ret: num(m?.twr) ?? 0,
-    btc: num(m?.benchTwrBtc) ?? 0,
+    ret: num(m?.twr),
+    btc: num(m?.benchTwrBtc),
     eth: num(m?.benchTwrEth),
     sol: num(m?.benchTwrSol),
     beta: num(m?.betaBtc),
-    vol: num(m?.volatility) ?? 0,
-    dd: Math.abs(num(m?.maxDrawdown) ?? 0),
-    days: m?.coverage.daysCovered ?? 0,
+    vol: num(m?.volatility),
+    dd: dd === null ? null : Math.abs(dd),
+    days: m?.coverage.daysCovered ?? null,
     nav: navOf(e),
+    headlineEligible: m?.coverage.headlineEligible ?? null,
+    hasMetrics: m !== null,
     asOf: m?.asOf ?? e.aumAsOf,
   };
 }
 
-export function alphaOf(v: Vault): number {
+export function alphaOf(v: Pick<Vault, "ret" | "btc">): number | null {
+  if (v.ret === null || v.btc === null) return null;
   return v.ret - v.btc;
 }
 
-export function isJunk(v: Vault): boolean {
-  return v.nav === "artifact";
+export function canCompare(v: Pick<Vault, "hasMetrics" | "ret" | "btc">): boolean {
+  return v.hasMetrics && v.ret !== null && v.btc !== null;
 }
 
-export function tone(n: number): string {
+export function metricLabel(value: string | number | null | undefined, fallback = "Unavailable"): string {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+}
+
+export function tone(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "#AFA290";
   return n >= 0 ? "#5FD8C9" : "#E2793B";
 }
 
@@ -199,7 +215,8 @@ export function shortDate(iso: string): string {
 }
 
 /** Deterministic per-vault series ending at (1 + total return). */
-export function seriesFor(seedKey: string, total: number, n = 46): number[] {
+export function seriesFor(seedKey: string, total: number | null, n = 46): number[] | null {
+  if (total === null || !Number.isFinite(total)) return null;
   const N = n;
   let h = 2166136261;
   for (let i = 0; i < seedKey.length; i++) {
@@ -237,37 +254,6 @@ export function scalePoints(points: SeriesPoint[], amount: number): number[] {
   return points.map((p) => ((num(p.value) ?? 100) / 100) * amount);
 }
 
-export function filterVaults(
-  all: Vault[],
-  s: {
-    search: string;
-    watchOnly: boolean;
-    watch: string[];
-    navFilter: NavKind[];
-    hideJunk: boolean;
-    full: boolean;
-    window: number;
-    sort: SortKey;
-    dir: "asc" | "desc";
-  }
-): Vault[] {
-  const q = s.search.trim().toLowerCase();
-  let list = all.filter((v) => {
-    if (s.watchOnly && s.watch.indexOf(v.id) === -1) return false;
-    if (s.navFilter.length) {
-      if (s.navFilter.indexOf(v.nav) === -1) return false;
-    } else if (s.hideJunk && isJunk(v)) return false;
-    if (s.full && v.days < (s.window || 90)) return false;
-    if (!q) return true;
-    return (v.name + " " + v.addr + " " + v.venue).toLowerCase().indexOf(q) !== -1;
-  });
-  const key = (v: Vault) =>
-    ({ alpha: alphaOf(v), ret: v.ret, dd: -v.dd, vol: -v.vol, aum: v.aum || 0, days: v.days }[s.sort as Exclude<SortKey, "name">] ?? 0);
-  list = list.slice().sort((a, b) => (s.sort === "name" ? a.name.localeCompare(b.name) : key(b) - key(a)));
-  if (s.dir === "asc") list.reverse();
-  return list;
-}
-
 export const MONO = "var(--font-mono)";
 export const DISPLAY = "var(--font-display)";
 export const SANS = "var(--font-body)";
@@ -290,7 +276,7 @@ export function seg(on: boolean): CSSProperties {
 }
 
 export function chip(on: boolean, accent?: string): CSSProperties {
-  const tone = accent || "#5FD8C9";
+  const toneColor = accent || "#5FD8C9";
   return {
     fontFamily: MONO,
     fontSize: 11,
@@ -301,8 +287,8 @@ export function chip(on: boolean, accent?: string): CSSProperties {
     cursor: "pointer",
     minHeight: 36,
     color: on ? "#0B0908" : "#AFA290",
-    background: on ? tone : "transparent",
-    border: `1px solid ${on ? tone : "rgba(244,238,226,.18)"}`,
+    background: on ? toneColor : "transparent",
+    border: `1px solid ${on ? toneColor : "rgba(244,238,226,.18)"}`,
     fontWeight: on ? 600 : 400,
   };
 }
