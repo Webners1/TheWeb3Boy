@@ -1,6 +1,6 @@
 /**
  * Drives the real dashboard against the live API: waits for vaults to load,
- * selects one, switches window/benchmarks/amount, and reports what rendered.
+ * pins one, switches window/benchmarks/amount, and reports what rendered.
  * Run the app on :3000 (the API's CORS allowlist includes localhost:3000).
  */
 import { chromium } from "playwright-core";
@@ -23,54 +23,43 @@ page.on("response", (r) => {
 });
 
 await page.goto(URL, { waitUntil: "networkidle" });
-await page.waitForSelector(".vault-table tbody tr", { timeout: 20000 });
+await page.waitForSelector(".yv-row", { timeout: 25000 });
 await page.waitForTimeout(600);
 
-const rowCount = await page.locator(".vault-table tbody tr").count();
-const heading = await page.locator(".dash-section-title").first().textContent();
-const firstRow = await page.locator(".vault-table tbody tr").first().innerText();
+const rowCount = await page.locator(".yv-row").count();
+const heading = await page.getByRole("heading", { name: "Ranked vaults" }).textContent();
+const firstRow = await page.locator(".yv-row").first().innerText();
+const challenger = await page.getByRole("heading", { level: 1 }).first().textContent();
 
 await page.screenshot({ path: "review-shots/dash-list.png", fullPage: false });
 
-// Select a vault -> comparison should appear
-await page.locator(".vault-table tbody tr").first().click();
-await page.waitForSelector(".compare-panel", { timeout: 20000 });
-await page.waitForSelector(".chart-svg", { timeout: 20000 });
-await page.waitForTimeout(900);
-const verdict = await page.locator(".compare-verdict").first().textContent().catch(() => null);
-const title = await page.locator(".compare-title").first().innerText().catch(() => null);
-const coverage = await page.locator(".coverage-row").first().innerText().catch(() => null);
-await page.screenshot({ path: "review-shots/dash-compare.png" });
+await page.getByRole("button", { name: "Share verdict" }).click();
+await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+await page.screenshot({ path: "review-shots/dash-share.png" });
+await page.getByRole("button", { name: "Close" }).click();
 
-// Change amount -> the headline money should change
-await page.fill("#amount", "25000");
-await page.waitForTimeout(700);
-const titleAfterAmount = await page.locator(".compare-title").first().innerText().catch(() => null);
+await page.getByRole("button", { name: /Filters/ }).click();
+await page.getByRole("button", { name: "ETH", exact: false }).first().click();
+await page.waitForTimeout(1200);
 
-// Switch window to 30d -> triggers a refetch of both list and compare
+const stake = page.getByLabel("Amount invested");
+await stake.fill("25000");
+await page.waitForTimeout(500);
+
 await page.getByRole("button", { name: "30d", exact: true }).click();
 await page.waitForTimeout(2500);
-const titleAfterWindow = await page.locator(".compare-title").first().innerText().catch(() => null);
-const seriesCount = await page.locator(".chart-svg path").count();
-
-// Add ETH benchmark
-await page.getByRole("button", { name: "ETH", exact: true }).click();
-await page.waitForTimeout(2200);
-const seriesAfterEth = await page.locator(".chart-svg path").count();
 await page.screenshot({ path: "review-shots/dash-final.png" });
+
+const chartPolylines = await page.locator("svg polyline").count();
 
 console.log(
   JSON.stringify(
     {
       rowCount,
       heading: heading?.trim(),
+      challenger: challenger?.trim(),
       firstRow: firstRow?.split("\n").slice(0, 6),
-      title,
-      verdict: verdict?.trim().slice(0, 140),
-      coverage: coverage?.replace(/\n/g, " | "),
-      titleAfterAmount,
-      titleAfterWindow,
-      chartPaths: { at90: seriesCount, afterEth: seriesAfterEth },
+      chartPolylines,
       apiCalls: api,
       errors,
     },

@@ -120,8 +120,8 @@ const CHAINS: Record<string, VenueMeta> = {
   solana: { label: "Solana", color: "#14F195", icon: SolanaIcon },
 };
 
-/** Drift and OKX don't carry a chain in `venue`, but the chain is a fixed fact about the protocol. */
-const IMPLIED_CHAIN: Record<string, string> = { drift: "solana" };
+/** Protocols that don't carry a chain in `venue`, but the chain is a fixed fact. */
+const IMPLIED_CHAIN: Record<string, string> = { drift: "solana", hyperliquid: "hyperevm" };
 
 function titleCase(s: string): string {
   return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
@@ -170,5 +170,30 @@ export default function VenueBadge({ venue, size = 16 }: { venue: string; size?:
         </span>
       )}
     </span>
+  );
+}
+
+export function venueProtocolLabel(venue: string): string {
+  return parseVenue(venue).protocolLabel;
+}
+
+/** Icon chips only — protocol mark plus optional chain mark, matching the v2 table cells. */
+export function VenueMarks({
+  venue,
+  protoSize = 18,
+  chainSize = 15,
+  showChain = true,
+}: {
+  venue: string;
+  protoSize?: number;
+  chainSize?: number;
+  showChain?: boolean;
+}) {
+  const { protocol, chain } = parseVenue(venue);
+  return (
+    <>
+      <Chip meta={protocol} size={protoSize} />
+      {showChain && chain && <Chip meta={chain} size={chainSize} />}
+    </>
   );
 }
