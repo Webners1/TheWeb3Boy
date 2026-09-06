@@ -285,12 +285,17 @@ export function listEntities(q: EntityQuery = {}) {
   return get<EntitiesResponse>("/entities", entityListParams(q));
 }
 
-export function entitiesSummary(q: EntityQuery = {}) {
+export async function entitiesSummary(q: EntityQuery = {}): Promise<EntitiesSummary | null> {
   const params = entityListParams(q);
   delete params.limit;
   delete params.offset;
   delete params.direction;
-  return get<EntitiesSummary>("/entities/summary", params);
+  try {
+    return await get<EntitiesSummary>("/entities/summary", params);
+  } catch {
+    // Production may not have this route yet. List pagination.total remains the census.
+    return null;
+  }
 }
 
 export function getEntity(id: string) {

@@ -837,20 +837,28 @@ function Dashboard() {
           <StripCell
             label="Entities that beat BTC"
             value={
-              <>
-                {beatCount}
-                <span style={{ fontFamily: MONO, fontSize: ".8rem", fontWeight: 400, color: "#6F6455" }}> / {summary?.withMetrics ?? 0}</span>
-              </>
+              summary ? (
+                <>
+                  {beatCount}
+                  <span style={{ fontFamily: MONO, fontSize: ".8rem", fontWeight: 400, color: "#6F6455" }}> / {summary.withMetrics}</span>
+                </>
+              ) : (
+                "—"
+              )
             }
             valueColor="#5FD8C9"
-            note={`${summary?.total ?? 0} in this filtered population`}
+            note={
+              summary
+                ? `${summary.total} in this filtered population`
+                : `${total} known in this filter · global beat-BTC pending API summary`
+            }
           />
           <StripCell
             label="Median return"
             value={pct(median)}
             valueColor={tone(median === null || btcRet === null ? null : median - btcRet)}
             note={
-              median === null || btcRet === null
+              !summary || median === null || btcRet === null
                 ? "Unavailable"
                 : median >= btcRet
                   ? "ahead of BTC"
@@ -888,7 +896,7 @@ function Dashboard() {
             label="Capital tracked"
             value={money(trackedCapital, { compact: true })}
             valueColor="#F4EEE2"
-            note="Sum of latest snapshot AUM in this filter"
+            note={summary ? "Sum of latest snapshot AUM in this filter" : "Unavailable until API summary is deployed"}
           />
         </section>
 
@@ -1227,19 +1235,30 @@ function Dashboard() {
         )}
 
         {!listError && !pageBusy && list.length === 0 && (
-          <p style={{ fontFamily: SANS, fontSize: 14, color: "#AFA290", borderLeft: "2px solid #5FD8C9", paddingLeft: 12, margin: "0 0 16px", lineHeight: 1.6 }}>
-            {watchOnly
-              ? "No saved vaults on this watchlist."
-              : state.search.trim()
-                ? "No vaults match that search."
-                : state.view === "ranking" && (census?.pagination.total ?? 0) > 0
-                  ? `No eligible ${venueLabel} metrics for this window. Switch to All vaults to see known entities.`
-                  : state.source === "okx"
-                    ? "No OKX entities have been successfully ingested yet."
-                    : state.source
-                      ? `No ${venueLabel} entities match these filters.`
-                      : "No entities match these filters."}
-          </p>
+          <div style={{ fontFamily: SANS, fontSize: 14, color: "#AFA290", borderLeft: "2px solid #5FD8C9", paddingLeft: 12, margin: "0 0 16px", lineHeight: 1.6 }}>
+            <p style={{ margin: 0 }}>
+              {watchOnly
+                ? "No saved vaults on this watchlist."
+                : state.search.trim()
+                  ? "No vaults match that search."
+                  : state.view === "ranking" && (census?.pagination.total ?? 0) > 0
+                    ? `No eligible ${venueLabel} metrics for this window. Switch to All vaults to see known entities.`
+                    : state.source === "okx"
+                      ? "No OKX entities have been successfully ingested yet."
+                      : state.source
+                        ? `No ${venueLabel} entities match these filters.`
+                        : "No entities match these filters."}
+            </p>
+            {state.view === "ranking" && !watchOnly && !state.search.trim() && (census?.pagination.total ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => replaceState({ view: "explore", sort: "name", direction: "asc" }, true)}
+                style={{ ...chip(true), marginTop: 12 }}
+              >
+                Show all {venueLabel === "All venues" ? "known vaults" : `${venueLabel} vaults`}
+              </button>
+            )}
+          </div>
         )}
 
         {list.length > 0 && (
@@ -1749,13 +1768,29 @@ function Dashboard() {
 
         {!watchOnly && (
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 16 }}>
-            <button type="button" disabled={state.page <= 1} onClick={() => replaceState({ page: state.page - 1 })} style={chip(false)}>
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={state.page <= 1}
+              onClick={() => replaceState({ page: state.page - 1 })}
+              style={{ ...chip(false), opacity: state.page <= 1 ? 0.4 : 1, cursor: state.page <= 1 ? "not-allowed" : "pointer" }}
+            >
               Previous
             </button>
             <span style={{ fontFamily: MONO, fontSize: 11, color: "#AFA290" }}>
               Page {total === 0 ? 0 : state.page} of {total === 0 ? 0 : totalPages} · {total === 0 ? "0–0 of 0" : `${fromRow}–${toRow} of ${total}`}
             </span>
-            <button type="button" disabled={state.page >= totalPages || total === 0} onClick={() => replaceState({ page: state.page + 1 })} style={chip(false)}>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={state.page >= totalPages || total === 0}
+              onClick={() => replaceState({ page: state.page + 1 })}
+              style={{
+                ...chip(false),
+                opacity: state.page >= totalPages || total === 0 ? 0.4 : 1,
+                cursor: state.page >= totalPages || total === 0 ? "not-allowed" : "pointer",
+              }}
+            >
               Next
             </button>
             <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "#6F6455" }}>Page size</span>
