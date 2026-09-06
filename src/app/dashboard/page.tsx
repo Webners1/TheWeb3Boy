@@ -584,6 +584,14 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: 1480, margin: "0 auto", padding: "clamp(16px,3vw,40px) clamp(12px,3vw,40px) 0" }}>
+        <header style={{ marginBottom: "clamp(16px,2.4vw,28px)", maxWidth: 820 }}>
+          <h1 style={{ fontFamily: DISPLAY, fontSize: "clamp(1.8rem,4vw,3.4rem)", fontWeight: 800, lineHeight: 1.05, margin: 0 }}>
+            Crypto copy trader and vault rankings
+          </h1>
+          <p style={{ fontFamily: SANS, fontSize: 15, color: "#AFA290", lineHeight: 1.6, margin: "12px 0 0", maxWidth: 720 }}>
+            Compare flow-neutral crypto performance with Bitcoin, Ethereum, and Solana across transparent windows and coverage data.
+          </p>
+        </header>
         <section
           aria-label="Market summary"
           className="yv-strip"
@@ -728,7 +736,7 @@ export default function Dashboard() {
               <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: ".1em", textTransform: "uppercase", color: "#5FD8C9" }}>
                 Challenger
               </span>
-              <h1
+              <h2
                 style={{
                   fontFamily: DISPLAY,
                   fontSize: "clamp(1.1rem,2.1vw,1.55rem)",
@@ -740,7 +748,7 @@ export default function Dashboard() {
                 }}
               >
                 {hero ? hero.name : listLoading ? "Loading vaults…" : "—"}
-              </h1>
+              </h2>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 {hero && <VenueMarks venue={hero.venue} protoSize={20} showChain={false} />}
                 <span style={{ fontFamily: MONO, fontSize: 11, color: "#AFA290" }}>
