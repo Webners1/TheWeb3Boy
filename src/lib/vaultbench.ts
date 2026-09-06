@@ -59,6 +59,10 @@ export type Entity = {
   baseCurrency: string;
   inceptionDate: string | null;
   status: string;
+  /** AUM in USD as the venue last reported it. Null when the venue doesn't publish one. */
+  aumUsd: string | null;
+  /** Snapshot date for `aumUsd`. Independent of `metrics.asOf`. */
+  aumAsOf: string | null;
   metrics: Metrics;
 };
 

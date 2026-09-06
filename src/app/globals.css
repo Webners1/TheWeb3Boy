@@ -23,7 +23,7 @@
    utility such as px-3 and py-1.5. */
 *{box-sizing:border-box;}
 html{scroll-behavior:smooth;height:100%;}
-html,body{max-width:100vw;overflow-x:hidden;}
+html,body{max-width:100%;overflow-x:hidden;}
 body{
   background:var(--bg);
   color:var(--text);
@@ -262,7 +262,17 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--teal);outline-offs
 /* --- dashboard: comparison panel --- */
 .compare-panel{border:1px solid var(--line-strong);padding:26px;margin-bottom:48px;}
 .compare-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
-.compare-eyebrow{font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.08em;color:var(--text-faint);margin-bottom:8px;}
+.compare-eyebrow{font-family:var(--font-mono);font-size:11.5px;letter-spacing:0.08em;color:var(--text-faint);margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.compare-capital{color:var(--text-dim);}
+
+.venue-badge{display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;color:var(--text-dim);}
+.venue-chip{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;flex:none;}
+.venue-chip-icon{width:62%;height:62%;}
+.venue-monogram{font-family:var(--font-mono);font-weight:700;font-size:9px;line-height:1;}
+.venue-name{color:var(--text-dim);}
+.venue-chain{display:inline-flex;align-items:center;gap:5px;color:var(--text-faint);}
+.venue-sep{font-size:0.85em;}
+.vault-table td.venue-cell{padding-top:10px;padding-bottom:10px;}
 .compare-title{font-family:var(--font-display);font-weight:700;font-size:clamp(1.5rem,3.4vw,2.3rem);color:var(--teal);}
 .compare-title .vs{font-family:var(--font-mono);font-size:0.8rem;font-weight:400;color:var(--text-faint);text-transform:lowercase;}
 .compare-title .btc{color:var(--copper);}
@@ -286,7 +296,7 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--teal);outline-offs
 .chart-empty{font-family:var(--font-mono);font-size:12px;color:var(--text-faint);padding:28px 0;}
 
 /* --- dashboard --- */
-.dash{min-height:100vh;}
+.dash{min-height:100vh;max-width:100%;overflow-x:clip;}
 .window-tag{font-family:var(--font-mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint);margin-left:12px;}
 .vault-table tbody tr{cursor:pointer;}
 .vault-table tbody tr.row-selected td{background:rgba(95,216,201,0.08);color:var(--text);}
@@ -321,7 +331,10 @@ a:focus-visible, button:focus-visible{outline:2px solid var(--teal);outline-offs
 .pill{display:inline-block;font-size:10.5px;letter-spacing:0.05em;text-transform:uppercase;padding:3px 8px;border:1px solid currentColor;border-radius:2px;}
 .pill.up{color:var(--teal);}
 .pill.down{color:var(--copper);}
-.table-wrap{overflow-x:auto;}
+.table-wrap{overflow-x:auto;max-width:100%;}
+.coverage-cell{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;}
+.coverage-cell .pill-row{display:flex;flex-wrap:wrap;gap:6px;}
+.coverage-cell .api-note{margin-top:0;}
 
 @media (max-width:640px){
   .duel-title{gap:12px;}

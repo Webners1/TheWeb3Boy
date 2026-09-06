@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import CompareChart, { type ChartSeries } from "@/components/CompareChart";
+import VenueBadge from "@/components/VenueBadge";
 import {
   API_BASE,
   SORTS,
@@ -32,7 +33,7 @@ export default function Dashboard() {
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [status, setStatus] = useState<string>("");
   const [fullWindow, setFullWindow] = useState(true);
-  const [hideOutliers, setHideOutliers] = useState(true);
+  const [hideExtreme, setHideExtreme] = useState(true);
   const [search, setSearch] = useState("");
 
   // amount
@@ -74,11 +75,9 @@ export default function Dashboard() {
   const listError = listErr instanceof Error ? listErr.message : null;
   const cmpError = cmpErr instanceof Error ? cmpErr.message : null;
 
-  // A handful of Enzyme vaults report NAV series that produce returns in the
-  // millions of percent and betas in the thousands. Those are upstream data
-  // artifacts, not performance, and they otherwise dominate an alpha ranking.
-  // Filtered here rather than hidden: the count is reported below the table.
-  const isArtifact = useCallback((e: Entity) => {
+  // Display filter only. A return above ±1000% or |beta| above 50 is hard to
+  // read on this table; that threshold is not proof the figure is a data error.
+  const isExtremeReturn = useCallback((e: Entity) => {
     const twr = num(e.metrics?.twr);
     const beta = num(e.metrics?.betaBtc);
     return (twr !== null && Math.abs(twr) > 10) || (beta !== null && Math.abs(beta) > 50);
@@ -89,10 +88,11 @@ export default function Dashboard() {
     const searched = q
       ? entities.filter((e) => e.name.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q) || e.externalId.toLowerCase().includes(q))
       : entities;
-    if (!hideOutliers) return { visible: searched, hiddenCount: 0 };
-    const kept = searched.filter((e) => !isArtifact(e));
+    if (!hideExtreme) return { visible: searched, hiddenCount: 0 };
+    const kept = searched.filter((e) => !isExtremeReturn(e));
     return { visible: kept, hiddenCount: searched.length - kept.length };
-  }, [entities, search, hideOutliers, isArtifact]);
+  }, [entities, search, hideExtreme, isExtremeReturn]);
+  const exploring = !fullWindow;
 
   const chartSeries: ChartSeries[] = useMemo(() => {
     if (!cmp) return [];
@@ -248,11 +248,11 @@ export default function Dashboard() {
               </button>
               <button
                 type="button"
-                className={`chip ${hideOutliers ? "chip-on" : ""}`}
-                onClick={() => setHideOutliers((v) => !v)}
-                title="Hide vaults whose reported return exceeds ±1000% or beta exceeds ±50 — upstream NAV artifacts, not performance"
+                className={`chip ${hideExtreme ? "chip-on" : ""}`}
+                onClick={() => setHideExtreme((v) => !v)}
+                title="Hide rows whose reported return exceeds ±1000% or |beta| exceeds 50 so they do not dominate the table. This is a display filter, not a data-error verdict."
               >
-                Hide data artifacts
+                Hide extreme returns
               </button>
             </div>
           </div>
@@ -277,7 +277,18 @@ export default function Dashboard() {
             <div className="compare-head">
               <div>
                 <p className="compare-eyebrow">
-                  {shortName(selected.name)} · {selected.venue}
+                  <span>{shortName(selected.name)}</span>
+                  <span className="venue-sep">·</span>
+                  <VenueBadge venue={selected.venue} />
+                  {selected.aumUsd !== null && (
+                    <>
+                      <span className="venue-sep">·</span>
+                      <span className="compare-capital" title="Newest snapshot the venue published, not capital over this window">
+                        {formatMoney(num(selected.aumUsd))} latest AUM
+                        {selected.aumAsOf !== null ? ` (${selected.aumAsOf})` : ""}
+                      </span>
+                    </>
+                  )}
                 </p>
                 <h2 className="compare-title">
                   {outcome?.vault !== null && outcome?.vault !== undefined ? formatMoney(outcome.vault) : "—"}{" "}
@@ -341,7 +352,8 @@ export default function Dashboard() {
 
         <p className="api-note">
           Each vault uses its latest available record; dates can differ.
-          {!fullWindow && " Exploring partial and excluded records — these are not all eligible for ranking."}
+          Latest AUM is that newest snapshot, not capital over the selected window.
+          {exploring && " Exploring partial and excluded records — these are not all eligible for ranking."}
         </p>
 
         {listError && (
@@ -352,9 +364,9 @@ export default function Dashboard() {
 
         {hiddenCount > 0 && (
           <p className="api-note">
-            {hiddenCount} vault{hiddenCount === 1 ? "" : "s"} hidden: reported return above ±1000% or beta above
-            ±50. In this dataset those come from upstream NAV artifacts rather than performance. Turn off
-            &ldquo;Hide data artifacts&rdquo; to see them.
+            {hiddenCount} vault{hiddenCount === 1 ? "" : "s"} hidden because reported return exceeds ±1000% or
+            |beta| exceeds 50. That threshold is a display filter, not proof those figures are data errors.
+            Turn off &ldquo;Hide extreme returns&rdquo; to see them.
           </p>
         )}
 
@@ -364,6 +376,9 @@ export default function Dashboard() {
               <tr>
                 <th>Vault</th>
                 <th>Venue</th>
+                <th style={{ textAlign: "right" }} title="Newest snapshot AUM, not window capital">
+                  Latest AUM
+                </th>
                 <th style={{ textAlign: "right" }}>Return</th>
                 <th style={{ textAlign: "right" }}>BTC</th>
                 <th style={{ textAlign: "right" }}>Alpha vs BTC</th>
@@ -384,7 +399,13 @@ export default function Dashboard() {
                     onClick={() => setSelected(e)}
                   >
                     <td className="name">{shortName(e.name)}</td>
-                    <td>{e.venue}</td>
+                    <td className="venue-cell">
+                      <VenueBadge venue={e.venue} />
+                    </td>
+                    <td className="num">
+                      {e.aumUsd !== null ? formatMoney(num(e.aumUsd)) : "—"}
+                      {e.aumAsOf !== null && <div className="api-note">As of {e.aumAsOf}</div>}
+                    </td>
                     <td className="num">{formatPct(m?.twr)}</td>
                     <td className="num">{formatPct(m?.benchTwrBtc)}</td>
                     <td className={`num ${alpha !== null && alpha >= 0 ? "pos" : "neg"}`}>
@@ -392,9 +413,17 @@ export default function Dashboard() {
                     </td>
                     <td className="num">{m?.betaBtc ? Number(m.betaBtc).toFixed(2) : "—"}</td>
                     <td className="num">{formatPct(m?.maxDrawdown)}</td>
-                    <td>
-                      <span className={`pill ${m?.coverage.isFullWindow ? "up" : "down"}`}>
-                        {m ? `${m.coverage.daysCovered}d` : "—"}
+                    <td className="coverage-cell">
+                      <span className="pill-row">
+                        <span className={`pill ${m?.coverage.isFullWindow ? "up" : "down"}`}>
+                          {m ? `${m.coverage.daysCovered}d` : "—"}
+                        </span>
+                        {exploring && m && !m.coverage.isFullWindow && (
+                          <span className="pill down">partial</span>
+                        )}
+                        {exploring && m && !m.coverage.headlineEligible && (
+                          <span className="pill down">excluded</span>
+                        )}
                       </span>
                       {m && <div className="api-note">As of {m.asOf}</div>}
                     </td>
@@ -406,7 +435,7 @@ export default function Dashboard() {
               })}
               {!listLoading && !visible.length && !listError && (
                 <tr>
-                  <td colSpan={9} className="empty-row">
+                  <td colSpan={10} className="empty-row">
                     No vaults match these filters.
                   </td>
                 </tr>
