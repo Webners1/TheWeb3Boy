@@ -17,7 +17,7 @@ import { motion, useSpring, useMotionTemplate } from "framer-motion";
  * state, so the lens can move every frame without re-rendering the tree.
  */
 
-const IMAGE_URL = "https://pbs.twimg.com/profile_banners/1533699647683940352/1784648933/1500x500";
+const IMAGE_URL = "/hero.jpg";
 const IMG_W = 1500;
 const IMG_H = 500;
 

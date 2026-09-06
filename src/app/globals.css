@@ -125,6 +125,7 @@ p{margin:0;}
   transition:max-height .35s cubic-bezier(.22,.61,.36,1), opacity .25s ease;
 }
 .mobile-menu.open{max-height:340px;opacity:1;}
+.mobile-menu[hidden]{display:none;}
 .mobile-menu a{
   padding:16px clamp(20px,4vw,64px);border-top:1px solid var(--line);
   font-family:var(--font-mono);font-size:13px;letter-spacing:0.06em;text-transform:uppercase;

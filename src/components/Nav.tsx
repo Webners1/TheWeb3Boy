@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const SOCIAL_LINKS = [
   { href: "https://x.com/TheWeb3B0Y", label: "X" },
@@ -48,6 +49,8 @@ const ICONS: Record<string, () => React.JSX.Element> = {
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const sectionHref = (id: string) => (pathname === "/" ? `#${id}` : `/#${id}`);
 
   // Close the mobile menu on Escape, and if the viewport grows back past
   // the breakpoint while it's open (e.g. rotating a tablet).
@@ -75,7 +78,7 @@ export default function Nav() {
 
       <ul className="nav-links">
         <li className="nav-dropdown">
-          <a href="#tools">Tools</a>
+          <Link href={sectionHref("tools")}>Tools</Link>
           <div className="nav-dropdown-menu">
             <Link href="/dashboard" className="nav-dropdown-item">
               <span className="ndi-name">youVsBTC</span>
@@ -89,10 +92,10 @@ export default function Nav() {
           </div>
         </li>
         <li>
-          <a href="#about">About</a>
+          <Link href={sectionHref("about")}>About</Link>
         </li>
         <li>
-          <a href="#connect">Connect</a>
+          <Link href={sectionHref("connect")}>Connect</Link>
         </li>
       </ul>
 
@@ -118,22 +121,22 @@ export default function Nav() {
         </button>
       </div>
 
-      <nav id="mobileMenu" className={`mobile-menu ${open ? "open" : ""}`} aria-hidden={!open}>
-        <a href="#tools" onClick={() => setOpen(false)}>
+      <nav id="mobileMenu" className={`mobile-menu ${open ? "open" : ""}`} aria-hidden={!open} hidden={!open}>
+        <Link href={sectionHref("tools")} onClick={() => setOpen(false)}>
           Tools
-        </a>
+        </Link>
         <Link href="/dashboard" onClick={() => setOpen(false)}>
           youVsBTC dashboard
         </Link>
         <Link href="/youvsbtc" onClick={() => setOpen(false)}>
           How youVsBTC works
         </Link>
-        <a href="#about" onClick={() => setOpen(false)}>
+        <Link href={sectionHref("about")} onClick={() => setOpen(false)}>
           About
-        </a>
-        <a href="#connect" onClick={() => setOpen(false)}>
+        </Link>
+        <Link href={sectionHref("connect")} onClick={() => setOpen(false)}>
           Connect
-        </a>
+        </Link>
         <div className="mobile-menu-socials">
           {SOCIAL_LINKS.map((s) => {
             const Icon = ICONS[s.label];
